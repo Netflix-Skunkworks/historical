@@ -1,0 +1,28 @@
+{
+  "name": "historical",
+  "version": "0.1.0",
+  "description": "A collection of AWS Lambda functions for collecting and storing AWS configuration data.",
+  "main": "index.js",
+  "scripts": {
+    "test": "python test.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Netflix-Skunkworks/historical.git"
+  },
+  "keywords": [
+    "python",
+    "aws",
+    "lambda",
+    "serverless"
+  ],
+  "author": "kglisson@netflix.com",
+  "license": "Apache",
+  "bugs": {
+    "url": "https://github.com/Netflix-Skunkworks/historical/issues"
+  },
+  "homepage": "https://github.com/Netflix-Skunkworks/historical/#readme",
+  "dependencies": {
+    "serverless-python-requirements": "^2.2.1"
+  }
+}
