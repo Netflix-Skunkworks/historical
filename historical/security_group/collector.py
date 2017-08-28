@@ -50,7 +50,7 @@ def handler(event, context):
         events = [event]
 
     for event in events:
-        event_type = determine_event_type(event)
+        event_type = determine_event_type(event, "aws.ec2")
 
         if event_type == 'poller':
             data = process_poller_event(event)
