@@ -8,10 +8,16 @@ Allows for the tracking of AWS configuration data across accounts/regions/techno
 import sys
 import os.path
 
+import subprocess
+from distutils import log
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__)))
 
+# When executing the setup.py, we need to be able to import ourselves, this
+# means that we need to add the src/ directory to the sys.path.
 sys.path.insert(0, ROOT)
 
 about = {}
@@ -24,8 +30,9 @@ install_requires = [
     'click==6.7',
     'pynamodb==3.1.0',
     'deepdiff==3.3.0',
-    'raven_python_lambda==0.1.2dev1',
-    'cloudaux'
+    'raven_python_lambda',
+    'cloudaux',
+    'delegator'
 ]
 
 tests_require = [
@@ -33,6 +40,18 @@ tests_require = [
     'moto==1.0.1',
     'coveralls==1.1'
 ]
+
+
+class InstallServerless(install):
+    def run(self):
+        log.info("Running [npm install --quiet] in {0}".format(ROOT))
+        try:
+            subprocess.check_output(['npm', 'install', '--quiet'], cwd=ROOT)
+        except subprocess.CalledProcessError as e:
+            log.warn("Unable to install javascript components! Reason: {}".format(e))
+
+        install.run(self)
+
 
 setup(
     name=about["__title__"],
@@ -49,6 +68,9 @@ setup(
     extras_require={
         'tests': tests_require
     },
+    cmdclass={
+        'install': InstallServerless
+    },
     entry_points={
         'console_scripts': [
             'historical = historical.cli:cli',
@@ -56,4 +78,5 @@ setup(
     },
     keywords=['aws', 'account_management']
 )
+
 
