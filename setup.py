@@ -30,9 +30,7 @@ install_requires = [
     'click==6.7',
     'pynamodb==3.1.0',
     'deepdiff==3.3.0',
-    'raven_python_lambda',
-    'cloudaux',
-    'delegator'
+    'cloudaux'
 ]
 
 tests_require = [
@@ -40,17 +38,6 @@ tests_require = [
     'moto==1.0.1',
     'coveralls==1.1'
 ]
-
-
-class InstallServerless(install):
-    def run(self):
-        log.info("Running [npm install --quiet] in {0}".format(ROOT))
-        try:
-            subprocess.check_output(['npm', 'install', '--quiet'], cwd=ROOT)
-        except subprocess.CalledProcessError as e:
-            log.warn("Unable to install javascript components! Reason: {}".format(e))
-
-        install.run(self)
 
 
 setup(
@@ -67,9 +54,6 @@ setup(
     install_requires=install_requires,
     extras_require={
         'tests': tests_require
-    },
-    cmdclass={
-        'install': InstallServerless
     },
     entry_points={
         'console_scripts': [

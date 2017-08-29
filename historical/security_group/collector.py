@@ -6,13 +6,8 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
 import logging
-import os
 
-from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
-from cloudaux.aws.sqs import get_queue_url, receive_message
-
-from historical.common.events import process_poller_event, determine_event_type, process_cloudwatch_event
 from historical.security_group.models import CurrentSecurityGroupModel
 
 logging.basicConfig()
@@ -25,7 +20,6 @@ def get_configuration_data(data):
     return describe_security_groups(**data)
 
 
-@RavenLambdaWrapper()
 def handler(event, context):
     """
     Historical security group event collector.

@@ -8,7 +8,6 @@
 import logging
 import os
 
-from raven_python_lambda import RavenLambdaWrapper
 from swag_client.backend import SWAGManager
 from swag_client.util import parse_swag_config_options
 
@@ -19,7 +18,6 @@ log = logging.getLogger("historical")
 log.setLevel(logging.INFO)
 
 
-@RavenLambdaWrapper()
 def handler(event, context):
     """
     Historical security group event poller.
