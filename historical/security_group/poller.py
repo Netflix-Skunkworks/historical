@@ -8,16 +8,21 @@
 import logging
 import os
 
+from raven_python_lambda import RavenLambdaWrapper
+from cloudaux.aws.ec2 import describe_security_groups
+
 from swag_client.backend import SWAGManager
 from swag_client.util import parse_swag_config_options
 
-from historical.common.events import create_polling_event
+from historical.common.kinesis import produce_events
+
 
 logging.basicConfig()
 log = logging.getLogger("historical")
 log.setLevel(logging.INFO)
 
 
+@RavenLambdaWrapper()
 def handler(event, context):
     """
     Historical security group event poller.
@@ -29,16 +34,21 @@ def handler(event, context):
     """
     log.debug('Running poller. Configuration: {}'.format(event))
 
-    if os.environ['SWAG_ENABLED']:
+    if os.environ.get('SWAG_BUCKET', False):
         swag_opts = {
-            'swag.type': 'dynamodb'
+            'swag.type': 's3',
+            'swag.bucket_name': os.environ['SWAG_BUCKET'],
+            'swag.data_file': os.environ.get('SWAG_DATA_FILE', 'accounts.json'),
+            'swag.region': os.environ.get('SWAG_BUCKET_REGION', 'us-east-1')
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
         accounts = swag.get_all()
     else:
         accounts = os.environ['ENABLED_ACCOUNTS']
 
-    for account, regions in accounts:
-        create_polling_event(account, regions)
+    for account in accounts:
+        groups = describe_security_groups(account_number=account['id'], assume_role=os.environ['HISTORICAL_ROLE'], region=os.environ['AWS_DEFAULT_REGION'])
+        events = [{'group_id': g['GroupId'], 'owner_id': g['OwnerId']} for g in groups['SecurityGroups']]
+        produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupEventStream'))
 
-    log.debug('Finished generating polling events. Events Created: {}'.format(len(accounts)))
+        log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))

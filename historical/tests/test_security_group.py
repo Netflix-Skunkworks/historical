@@ -1,5 +1,3 @@
-
-
 def test_current_table(current_security_group_table):
     from historical.security_group.models import CurrentSecurityGroupModel
     group = {
@@ -195,8 +193,16 @@ def test_durable_table(durable_security_group_table):
     assert len(items) == 1
 
 
-def test_poller():
-    assert True
+def test_poller(historical_kinesis, historical_role, mock_lambda_environment, security_groups, swag_accounts):
+    from historical.security_group.poller import handler
+    handler(None, None)
+
+    shard_id = historical_kinesis.describe_stream(
+        StreamName="historicalstream")["StreamDescription"]["Shards"][0]["ShardId"]
+    iterator = historical_kinesis.get_shard_iterator(
+        StreamName="historicalstream", ShardId=shard_id, ShardIteratorType="AT_SEQUENCE_NUMBER", StartingSequenceNumber="0")
+    records = historical_kinesis.get_records(ShardIterator=iterator["ShardIterator"])
+    assert len(records['Records']) == 3
 
 
 def test_differ():

@@ -30,7 +30,8 @@ install_requires = [
     'click==6.7',
     'pynamodb==3.1.0',
     'deepdiff==3.3.0',
-    'cloudaux'
+    'cloudaux',
+    'raven-python-lambda'
 ]
 
 tests_require = [
