@@ -16,7 +16,7 @@ SECURITY_GROUP_EVENT = {
                         "groups": {
                             "items": [
                                 {
-                                    "groupId": "sg-4e386e31"
+                                    "groupId": "sg-4e386e22"
                                 }
                             ]
                         },

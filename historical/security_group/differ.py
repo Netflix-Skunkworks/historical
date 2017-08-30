@@ -9,8 +9,6 @@ import logging
 from boto3.dynamodb.types import TypeDeserializer
 from deepdiff import DeepDiff
 
-from raven_python_lambda import RavenLambdaWrapper
-
 from historical.security_group.models import DurableSecurityGroupModel
 
 deser = TypeDeserializer()
@@ -20,7 +18,6 @@ log = logging.getLogger('historical')
 log.setLevel(logging.INFO)
 
 
-@RavenLambdaWrapper()
 def handler(event, context):
     """
     Historical security group event differ.

@@ -1,17 +1,26 @@
+import os
 import pytest
+
+import boto3
+
 from moto.dynamodb2 import mock_dynamodb2
 from moto.kinesis import mock_kinesis
 from moto.s3 import mock_s3
 from moto.iam import mock_iam
 from moto.sts import mock_sts
-import boto3
-import os
+from moto.ec2 import mock_ec2
 
 
 @pytest.fixture(scope="function")
 def s3():
     with mock_s3():
         yield boto3.client("s3")
+
+
+@pytest.fixture(scope="function")
+def ec2():
+    with mock_ec2():
+        yield boto3.client("ec2")
 
 
 @pytest.fixture(scope="function")
@@ -33,39 +42,24 @@ def dynamodb():
 
 
 @pytest.fixture(scope="function")
-def swag_table(dynamodb):
-    resource = boto3.resource('dynamodb', region_name='us-east-1')
-
-    table = resource.create_table(
-        TableName='accounts',
-        KeySchema=[
-            {
-                'AttributeName': 'id',
-                'KeyType': 'HASH'
-            }
-        ],
-        AttributeDefinitions=[
-            {
-                'AttributeName': 'id',
-                'AttributeType': 'S'
-            }
-        ],
-        ProvisionedThroughput={
-            'ReadCapacityUnits': 1,
-            'WriteCapacityUnits': 1
-        })
-
-    table.meta.client.get_waiter('table_exists').wait(TableName='accounts')
-
-
-@pytest.fixture(scope="function")
-def swag_accounts(swag_table):
+def swag_accounts(s3):
     from swag_client.backend import SWAGManager
     from swag_client.util import parse_swag_config_options
 
+    bucket_name = 'SWAG'
+    data_file = 'accounts.json'
+    region = 'us-east-1'
+
+    s3.create_bucket(Bucket=bucket_name)
+    os.environ['SWAG_BUCKET'] = bucket_name
+    os.environ['SWAG_DATA_FILE'] = data_file
+    os.environ['SWAG_REGION'] = region
+
     swag_opts = {
-        'swag.type': 'dynamodb',
-        'swag.namespace': 'accounts',
+        'swag.type': 's3',
+        'swag.bucket_name': bucket_name,
+        'swag.data_file': data_file,
+        'swag.region': region,
         'swag.cache_expires': 0
     }
 
@@ -83,8 +77,6 @@ def swag_accounts(swag_table):
         'provider': 'aws',
         'sensitive': False
     }
-
-    os.environ['SWAG_ENABLED'] = "True"
 
     swag.create(account)
 
@@ -113,6 +105,14 @@ def buckets(s3):
 
 
 @pytest.fixture(scope="function")
+def security_groups(ec2):
+    """Creates security groups."""
+    ec2.create_security_group(
+        Description='test security group',
+        GroupName='test',
+        VpcId='vpc-test'
+    )
+
 def mock_lambda_context():
     class MockLambdaContext():
         @staticmethod
@@ -123,7 +123,11 @@ def mock_lambda_context():
     import raven_python_lambda
     raven_python_lambda.install_timers = lambda x, y: None
 
-    return MockLambdaContext()
+
+@pytest.fixture(scope="function")
+def mock_lambda_environment():
+    os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
+    os.environ['SENTRY_ENABLED'] = 'f'
 
 
 @pytest.fixture()
