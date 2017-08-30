@@ -117,7 +117,11 @@ def mock_lambda_context():
     class MockLambdaContext():
         @staticmethod
         def get_remaining_time_in_millis():
-            return 9999999999
+            return 5000
+
+    # Mock out the Raven Python Lambda timer method:
+    import raven_python_lambda
+    raven_python_lambda.install_timers = lambda x, y: None
 
     return MockLambdaContext()
 
