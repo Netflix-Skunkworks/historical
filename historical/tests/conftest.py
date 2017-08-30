@@ -113,6 +113,16 @@ def security_groups(ec2):
         VpcId='vpc-test'
     )
 
+def mock_lambda_context():
+    class MockLambdaContext():
+        @staticmethod
+        def get_remaining_time_in_millis():
+            return 5000
+
+    # Mock out the Raven Python Lambda timer method:
+    import raven_python_lambda
+    raven_python_lambda.install_timers = lambda x, y: None
+
 
 @pytest.fixture(scope="function")
 def mock_lambda_environment():
@@ -136,6 +146,3 @@ def durable_security_group_table():
     DurableSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
     yield
     mock_dynamodb2().stop()
-
-
-
