@@ -61,7 +61,7 @@ def test_poller(historical_role, buckets, mock_lambda_context, historical_kinesi
     # Need to ensure that 50 Buckets were added to the stream:
     kinesis = boto3.client("kinesis", region_name="us-east-1")
 
-    all_buckets = {}
+    all_buckets = {"SWAG": True}
     for i in range(0, 50):
         all_buckets["testbucket{}".format(i)] = True
 

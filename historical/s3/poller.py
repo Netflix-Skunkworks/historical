@@ -78,9 +78,13 @@ def handler(event, context):
     log.debug('Running poller. Configuration: {}'.format(event))
 
     # Get the queue that we are going to place the events in:
-    if os.environ['SWAG_ENABLED']:
+    if os.environ['SWAG_BUCKET']:
         swag_opts = {
-            'swag.type': 'dynamodb'
+            'swag.type': 's3',
+            'swag.bucket_name': os.environ['SWAG_BUCKET'],
+            'swag.data_file': os.environ['SWAG_DATA_FILE'],
+            'swag.region': os.environ['SWAG_REGION'],
+            'swag.cache_expires': 0
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
         accounts = [account["id"] for account in swag.get_all()]
