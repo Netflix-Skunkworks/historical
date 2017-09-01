@@ -113,6 +113,8 @@ def security_groups(ec2):
         VpcId='vpc-test'
     )
 
+
+@pytest.fixture(scope="function")
 def mock_lambda_context():
     class MockLambdaContext():
         @staticmethod
