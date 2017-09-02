@@ -7,11 +7,6 @@
 """
 
 
-def process_poller_event(event):
-    """Use poller event data to describe configuration data."""
-    return dict()
-
-
 def determine_event_type(event, cloudwatch_event_str):
     """
     Determines whether we have a CloudWatch or a polling event.

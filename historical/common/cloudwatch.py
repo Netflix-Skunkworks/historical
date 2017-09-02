@@ -9,9 +9,6 @@ Helper functions for processing cloudwatch events.
 """
 import logging
 from datetime import datetime
-from itertools import zip_longest
-
-import boto3
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +21,6 @@ def filter_request_parameters(field_name, msg):
     val = msg.get('detail', {}).get(field_name, None)
 
     if not val:
-        print(msg.get('detail'))
         val = msg.get('detail', {}).get('requestParameters', {}).get(field_name, None)
 
     return val
@@ -55,36 +51,3 @@ def get_account_id(event):
     """Gets the account id from an event"""
     return event['account']
 
-
-def format_cloudwatch_event(data, source, account, region):
-    """Creates an event-detail that looks similar to what would normally come from aws."""
-    return {
-        "detail-type": "Polling Event via Historical",
-        "source": "historical.{0}".format(source),
-        "detail": {
-            "eventType": "AwsApiCall",
-            "eventTime": datetime.utcnow().isoformat(),
-            "awsRegion": region,
-            "userIdentity": {
-                "accountId": account
-            },
-            "eventData": data,
-        }
-    }
-
-
-def grouper(iterable, n, fillvalue=None):
-    """Collect data into fixed-length chunks or blocks"""
-    args = [iter(iterable)] * n
-    return zip_longest(*args, fillvalue=fillvalue)
-
-
-def create_events(events, source, account, region):
-    """Creates Cloudtrail Events"""
-    client = boto3.client('cloudwatch')
-
-    # cloudtrail only accepts 10 events at a time
-    for entries in grouper(events, 10):
-        client.put_events(
-            Entries=[format_cloudwatch_event(e, source, account, region) for e in entries]
-        )

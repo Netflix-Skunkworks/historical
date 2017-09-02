@@ -12,7 +12,7 @@ from marshmallow import Schema, fields, post_dump, pre_load
 
 
 class DurableHistoricalModel(object):
-    event_time = UTCDateTimeAttribute(range_key=True, default=datetime.utcnow())
+    eventTime = UTCDateTimeAttribute(range_key=True, default=datetime.utcnow())
 
 
 class CurrentHistoricalModel(object):
@@ -21,9 +21,9 @@ class CurrentHistoricalModel(object):
 
 class AWSHistoricalMixin(object):
     arn = UnicodeAttribute(hash_key=True)
-    aws_account_id = UnicodeAttribute()
-    user_identity = JSONAttribute(null=True)
-    principal_id = UnicodeAttribute(null=True)
+    accountId = UnicodeAttribute()
+    userIdentity = JSONAttribute(null=True)
+    principalId = UnicodeAttribute(null=True)
     configuration = JSONAttribute()
 
 

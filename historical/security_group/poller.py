@@ -5,8 +5,8 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
-import logging
 import os
+import logging
 
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
@@ -15,7 +15,6 @@ from swag_client.backend import SWAGManager
 from swag_client.util import parse_swag_config_options
 
 from historical.common.kinesis import produce_events
-
 
 logging.basicConfig()
 log = logging.getLogger("historical")

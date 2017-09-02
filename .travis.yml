@@ -1,0 +1,29 @@
+language: python
+
+matrix:
+  include:
+    - python: "3.6"
+
+cache:
+  directories:
+    - .pip_download_cache
+
+env:
+  global:
+    - PIP_DOWNLOAD_CACHE=".pip_download_cache"
+
+before_script:
+  - pip install --upgrade pip
+  - pip install --upgrade setuptools
+  - python setup.py develop
+  - pip install .[tests]
+
+script:
+  - coverage run -m py.test || exit 1
+
+after_success:
+  - coveralls
+
+notifications:
+  email:
+    - secops@netflix.com

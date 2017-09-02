@@ -32,13 +32,17 @@ install_requires = [
     'pynamodb==3.1.0',
     'deepdiff==3.3.0',
     'cloudaux',
-    'raven-python-lambda'
+    'raven-python-lambda',
+    'marshmallow==2.13.5',
+    'swag_client==0.2.9'
+
 ]
 
 tests_require = [
     'pytest==3.1.3',
     'moto==1.0.1',
-    'coveralls==1.1'
+    'coveralls==1.1',
+    'factory-boy==2.9.2'
 ]
 
 

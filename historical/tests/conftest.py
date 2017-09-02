@@ -107,7 +107,7 @@ def buckets(s3):
 @pytest.fixture(scope="function")
 def security_groups(ec2):
     """Creates security groups."""
-    ec2.create_security_group(
+    yield ec2.create_security_group(
         Description='test security group',
         GroupName='test',
         VpcId='vpc-test'
@@ -136,8 +136,7 @@ def mock_lambda_environment():
 def current_security_group_table():
     from historical.security_group.models import CurrentSecurityGroupModel
     mock_dynamodb2().start()
-    CurrentSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
-    yield
+    yield CurrentSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
     mock_dynamodb2().stop()
 
 
@@ -145,6 +144,5 @@ def current_security_group_table():
 def durable_security_group_table():
     from historical.security_group.models import DurableSecurityGroupModel
     mock_dynamodb2().start()
-    DurableSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
-    yield
+    yield DurableSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
     mock_dynamodb2().stop()

@@ -1,14 +1,25 @@
+import json
+from historical.tests.factories import (
+    CloudwatchEventFactory,
+    DetailFactory,
+    KinesisDataFactory,
+    KinesisRecordFactory,
+    KinesisRecordsFactory,
+    serialize
+)
+
+
 def test_current_table(current_security_group_table):
     from historical.security_group.models import CurrentSecurityGroupModel
     group = {
         'arn': 'arn:aws:ec2:us-east-1:123456789010:security-group/sg-1234568',
-        'aws_group_id': 'sg-1234568',
-        'aws_group_name': 'testGroup',
-        'aws_vpc_id': 'vpc-123343',
-        'aws_region': 'us-east-1',
-        'aws_account_id': '123456789010',
-        'description': 'This is a test',
-        'tags': [{'owner': 'test@example.com'}],
+        'GroupId': 'sg-1234568',
+        'GroupName': 'testGroup',
+        'VpcId': 'vpc-123343',
+        'accountId': '123456789010',
+        'OwnerId': '123456789010',
+        'Description': 'This is a test',
+        'Tags': [{'owner': 'test@example.com'}],
         'configuration': {
             'Description': 'string',
             'GroupName': 'string',
@@ -100,13 +111,13 @@ def test_durable_table(durable_security_group_table):
 
     group = {
         'arn': 'arn:aws:ec2:us-east-1:123456789010:security-group/sg-1234568',
-        'aws_group_id': 'sg-1234568',
-        'aws_group_name': 'testGroup',
-        'aws_vpc_id': 'vpc-123343',
-        'aws_region': 'us-east-1',
-        'aws_account_id': '123456789010',
-        'description': 'This is a test',
-        'tags': [{'owner': 'test@example.com'}],
+        'GroupId': 'sg-1234568',
+        'GroupName': 'testGroup',
+        'VpcId': 'vpc-123343',
+        'accountId': '123456789010',
+        'OwnerId': '123456789010',
+        'Description': 'This is a test',
+        'Tags': [{'owner': 'test@example.com'}],
         'configuration': {
             'Description': 'string',
             'GroupName': 'string',
@@ -209,5 +220,24 @@ def test_differ():
     assert True
 
 
-def test_collector():
-    assert True
+def test_collector(historical_role, mock_lambda_environment, security_groups, current_security_group_table):
+    from historical.security_group.models import CurrentSecurityGroupModel
+    from historical.security_group.collector import handler
+    event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={'GroupId': security_groups['GroupId']}
+        )
+    )
+    data = json.dumps(event, default=serialize)
+    data = KinesisRecordsFactory(
+        records=[
+            KinesisRecordFactory(
+                kinesis=KinesisDataFactory(data=data))
+        ]
+    )
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, {})
+
+    assert CurrentSecurityGroupModel.count() == 1

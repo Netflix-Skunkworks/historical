@@ -12,12 +12,12 @@ from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AW
 
 
 class SecurityGroupModel(object):
-    aws_group_id = UnicodeAttribute()
-    aws_group_name = UnicodeAttribute()
-    aws_vpc_id = UnicodeAttribute()
-    aws_region = UnicodeAttribute()
-    description = UnicodeAttribute()
-    tags = JSONAttribute()
+    GroupId = UnicodeAttribute()
+    GroupName = UnicodeAttribute()
+    VpcId = UnicodeAttribute()
+    OwnerId = UnicodeAttribute()
+    Description = UnicodeAttribute()
+    Tags = JSONAttribute()
 
 
 class DurableSecurityGroupModel(Model, DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
@@ -33,4 +33,5 @@ class CurrentSecurityGroupModel(Model, CurrentHistoricalModel, AWSHistoricalMixi
 class ViewIndex(GlobalSecondaryIndex):
     class Meta:
         projection = AllProjection()
+
     view = NumberAttribute(default=0, hash_key=True)
