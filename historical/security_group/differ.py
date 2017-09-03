@@ -17,6 +17,19 @@ logging.basicConfig()
 log = logging.getLogger('historical')
 log.setLevel(logging.INFO)
 
+EPHEMERAL_PATHS = {"root['attribute_values']['eventTime']"}
+
+
+def is_new_revision(latest_revision, current_revision):
+    """Determine if two revisions have actually changed."""
+    diff = DeepDiff(
+        current_revision._serialize(),
+        latest_revision._serialize(),
+        exclude_paths=EPHEMERAL_PATHS,
+        ignore_order=True
+    )
+    return diff
+
 
 def handler(event, context):
     """
@@ -25,8 +38,6 @@ def handler(event, context):
     Listens to the Historical current table and determines if there are differences that need to be persisted in the
     historical record.
     """
-    ephemeral_paths = {}
-
     for record in event['Records']:
         log.info('Processing stream record...')
         arn = record['dynamodb']['Keys']['arn']['S']
@@ -37,18 +48,22 @@ def handler(event, context):
             for item in new:
                 data[item] = deser.deserialize(new[item])
 
+            current_revision = DurableSecurityGroupModel(**data)
             if record['eventName'] == 'INSERT':
-                DurableSecurityGroupModel(data).save()
+                current_revision.save()
                 log.debug('Saving new revision to durable table.')
 
             elif record['eventName'] == 'MODIFY':
-                latest_revision = DurableSecurityGroupModel.query(arn)
+                # We want the newest items first.
+                # See: http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
+                latest_revision = list(DurableSecurityGroupModel.query(arn, scan_index_forward=False, limit=1))[0]
 
                 # determine if there is truly a difference, disregarding ephemeral_paths
-                if DeepDiff(data, latest_revision, exclude_paths=ephemeral_paths):
-                    DurableSecurityGroupModel(data).update()
+                if is_new_revision(latest_revision, current_revision):
+                    current_revision.save()
                     log.debug('Difference found saving new revision to durable table.')
 
         if record['eventName'] == 'REMOVE':
-            DurableSecurityGroupModel(record['dynamodb']['Keys']['arn']['S'], {}).update()
-            log.debug('Marking revision as deleted.')
+            current_revision = DurableSecurityGroupModel(configuration={})
+            current_revision.save()
+            log.debug('Adding deletion marker.')

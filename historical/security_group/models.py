@@ -5,10 +5,11 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
-from pynamodb.models import Model
+
+from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AWSHistoricalMixin
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, JSONAttribute
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
-from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AWSHistoricalMixin
+from pynamodb.models import Model
 
 
 class SecurityGroupModel(object):

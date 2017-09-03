@@ -6,13 +6,50 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 .. author:: Mike Grima <mgrima@netflix.com>
 """
+import decimal
+import json
 from datetime import datetime
-from pynamodb.attributes import UTCDateTimeAttribute, JSONAttribute, UnicodeAttribute
-from marshmallow import Schema, fields, post_dump, pre_load
+from pynamodb.attributes import UTCDateTimeAttribute, JSONAttribute, UnicodeAttribute, Attribute
+from marshmallow import Schema, fields, post_dump
+from pynamodb.constants import STRING
+
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, decimal.Decimal):
+            return int(o)
+        return super(DecimalEncoder, self).default(o)
+
+
+class ConfigurationAttribute(Attribute):
+    """
+        A JSON Attribute
+
+        Encodes JSON to unicode internally
+        """
+    attr_type = STRING
+
+    def serialize(self, value):
+        """
+        Serializes JSON to unicode
+        """
+        if value is None:
+            return None
+        encoded = json.dumps(value, cls=DecimalEncoder)
+        try:
+            return unicode(encoded)
+        except NameError:
+            return encoded
+
+    def deserialize(self, value):
+        """
+        Deserializes JSON
+        """
+        return json.loads(value)
 
 
 class DurableHistoricalModel(object):
-    eventTime = UTCDateTimeAttribute(range_key=True, default=datetime.utcnow())
+    pass
 
 
 class CurrentHistoricalModel(object):
@@ -20,11 +57,12 @@ class CurrentHistoricalModel(object):
 
 
 class AWSHistoricalMixin(object):
+    eventTime = UTCDateTimeAttribute(range_key=True, default=datetime.utcnow())
     arn = UnicodeAttribute(hash_key=True)
     accountId = UnicodeAttribute()
     userIdentity = JSONAttribute(null=True)
     principalId = UnicodeAttribute(null=True)
-    configuration = JSONAttribute()
+    configuration = ConfigurationAttribute()
 
 
 class HistoricalPollingEventDetail(Schema):
@@ -60,3 +98,5 @@ class HistoricalPollingBaseModel(Schema):
         data["time"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat()
 
         return data
+
+

@@ -1,8 +1,12 @@
 import pytz
 import base64
 import datetime
+from boto3.dynamodb.types import TypeSerializer
 from factory import SubFactory, Factory, post_generation
 from factory.fuzzy import FuzzyDateTime, FuzzyText
+
+
+seria = TypeSerializer()
 
 
 def serialize(obj):
@@ -62,6 +66,53 @@ class KinesisRecordsFactory(Factory):
             # A list of groups were passed in, use them
             for record in extracted:
                 self.Records.append(record)
+
+
+class DynamoDBData(object):
+    def __init__(self, NewImage, Keys):
+        self.NewImage = {k: seria.serialize(v) for k, v in NewImage.items()}
+        self.Keys = {k: seria.serialize(v) for k, v in Keys.items()}
+
+
+class DynamoDBDataFactory(Factory):
+    class Meta:
+        model = DynamoDBData
+
+    NewImage = {}
+    Keys = {}
+
+
+class DynamoDBRecord(object):
+    def __init__(self, dynamodb, eventName):
+        self.dynamodb = dynamodb
+        self.eventName = eventName
+
+
+class DynamoDBRecordFactory(Factory):
+    """Factory generating a DynamoDBRecord"""
+    class Meta:
+        model = DynamoDBRecord
+
+    dynamodb = SubFactory(DynamoDBDataFactory)
+    eventName = 'INSERT'
+
+
+class DynamoDBRecordsFactory(Factory):
+    class Meta:
+        model = Records
+
+    @post_generation
+    def Records(self, create, extracted, **kwargs):
+        if not create:
+            # Simple build, do nothing.
+            return
+
+        if extracted:
+            # A list of groups were passed in, use them
+            for record in extracted:
+                self.Records.append(record)
+
+
 
 
 class Event(object):
@@ -165,4 +216,3 @@ class HistoricalPollingEventFactory(CloudwatchEventFactory):
         model = HistoricalPollingEvent
 
     detail = SubFactory(DetailFactory)
-
