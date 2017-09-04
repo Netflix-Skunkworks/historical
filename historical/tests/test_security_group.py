@@ -1,6 +1,5 @@
 import json
-import pytz
-import datetime
+from datetime import datetime
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
@@ -14,12 +13,12 @@ from historical.tests.factories import (
 )
 
 SECURITY_GROUP = {
-    'arn': 'arn:aws:ec2:us-east-1:123456789010:security-group/sg-1234568',
+    'arn': 'arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568',
     'GroupId': 'sg-1234568',
     'GroupName': 'testGroup',
     'VpcId': 'vpc-123343',
-    'accountId': '123456789010',
-    'OwnerId': '123456789010',
+    'accountId': '123456789012',
+    'OwnerId': '123456789012',
     'Description': 'This is a test',
     'Tags': [{'owner': 'test@example.com'}],
     'configuration': {
@@ -107,7 +106,7 @@ def test_current_table(current_security_group_table):
 
     CurrentSecurityGroupModel(**SECURITY_GROUP).save()
 
-    items = list(CurrentSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789010:security-group/sg-1234568'))
+    items = list(CurrentSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
     assert len(items) == 1
 
@@ -115,11 +114,20 @@ def test_current_table(current_security_group_table):
 def test_durable_table(durable_security_group_table):
     from historical.security_group.models import DurableSecurityGroupModel
 
+    # we are explicit about our eventTimes because as RANGE_KEY it will need to be unique.
+    SECURITY_GROUP['eventTime'] = datetime(2017, 5, 11, 23, 30)
     DurableSecurityGroupModel(**SECURITY_GROUP).save()
 
-    items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789010:security-group/sg-1234568'))
+    items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
     assert len(items) == 1
+
+    SECURITY_GROUP['eventTime'] = datetime(2017, 5, 12, 23, 30)
+    DurableSecurityGroupModel(**SECURITY_GROUP).save()
+
+    items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
+
+    assert len(items) == 2
 
 
 def test_poller(historical_kinesis, historical_role, mock_lambda_environment, security_groups, swag_accounts):
@@ -138,13 +146,16 @@ def test_poller(historical_kinesis, historical_role, mock_lambda_environment, se
 def test_differ(durable_security_group_table):
     from historical.security_group.models import DurableSecurityGroupModel
     from historical.security_group.differ import handler
+
+    new_group = SECURITY_GROUP.copy()
+    new_group['eventTime'] = datetime(2017, 5, 12, 23, 30).isoformat() + 'Z'
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
                 dynamodb=DynamoDBDataFactory(
-                    NewImage=SECURITY_GROUP,
+                    NewImage=new_group,
                     Keys={
-                        'arn': SECURITY_GROUP['arn']
+                        'arn': new_group['arn']
                     }
                 ),
                 eventName='INSERT'
@@ -156,14 +167,17 @@ def test_differ(durable_security_group_table):
 
     assert DurableSecurityGroupModel.count() == 1
 
+    duplicate_group = SECURITY_GROUP.copy()
+    duplicate_group['eventTime'] = datetime(2017, 5, 12, 10, 30).isoformat() + 'Z'
+
     # ensure no new record for the same data
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
                 dynamodb=DynamoDBDataFactory(
-                    NewImage=SECURITY_GROUP,
+                    NewImage=duplicate_group,
                     Keys={
-                        'arn': SECURITY_GROUP['arn']
+                        'arn': duplicate_group['arn']
                     }
                 ),
                 eventName='MODIFY'
@@ -174,14 +188,14 @@ def test_differ(durable_security_group_table):
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 1
 
-    # ensure new record
-    group = SECURITY_GROUP.copy()
-    group['Description'] = 'changeme'
+    updated_group = SECURITY_GROUP.copy()
+    updated_group['eventTime'] = datetime(2017, 5, 12, 11, 30).isoformat() + 'Z'
+    updated_group['Description'] = 'changeme'
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
                 dynamodb=DynamoDBDataFactory(
-                    NewImage=group,
+                    NewImage=updated_group,
                     Keys={
                         'arn': SECURITY_GROUP['arn']
                     }
@@ -194,12 +208,15 @@ def test_differ(durable_security_group_table):
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 2
 
+    deleted_group = SECURITY_GROUP.copy()
+    deleted_group['eventTime'] = datetime(2017, 5, 12, 12, 30).isoformat() + 'Z'
+
     # ensure new record
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
                 dynamodb=DynamoDBDataFactory(
-                    NewImage=group,
+                    OldImage=deleted_group,
                     Keys={
                         'arn': SECURITY_GROUP['arn']
                     }
@@ -210,7 +227,7 @@ def test_differ(durable_security_group_table):
     )
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
-    assert DurableSecurityGroupModel.count() == 2
+    assert DurableSecurityGroupModel.count() == 3
 
 
 def test_collector(historical_role, mock_lambda_environment, security_groups, current_security_group_table):
@@ -218,8 +235,9 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
     from historical.security_group.collector import handler
     event = CloudwatchEventFactory(
         detail=DetailFactory(
-            requestParameters={'GroupId': security_groups['GroupId']}
-        )
+            requestParameters={'GroupId': security_groups['GroupId']},
+            eventName='CreateSecurityGroup'
+        ),
     )
     data = json.dumps(event, default=serialize)
     data = KinesisRecordsFactory(
@@ -231,6 +249,26 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, {})
+    handler(data, None)
 
     assert CurrentSecurityGroupModel.count() == 1
+
+    event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={'GroupId': security_groups['GroupId']},
+            eventName='DeleteSecurityGroup'
+        ),
+    )
+    data = json.dumps(event, default=serialize)
+    data = KinesisRecordsFactory(
+        records=[
+            KinesisRecordFactory(
+                kinesis=KinesisDataFactory(data=data))
+        ]
+    )
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, None)
+
+    assert CurrentSecurityGroupModel.count() == 0

@@ -9,9 +9,12 @@
 import decimal
 import json
 from datetime import datetime
-from pynamodb.attributes import UTCDateTimeAttribute, JSONAttribute, UnicodeAttribute, Attribute
+from dateutil.tz import tzutc
+from pynamodb.attributes import JSONAttribute, UnicodeAttribute, Attribute
 from marshmallow import Schema, fields, post_dump
 from pynamodb.constants import STRING
+
+DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -48,16 +51,39 @@ class ConfigurationAttribute(Attribute):
         return json.loads(value)
 
 
+class EventTimeAttribute(Attribute):
+    """
+    An attribute for storing a UTC Datetime or iso8601 string
+    """
+    attr_type = STRING
+
+    def serialize(self, value):
+        """
+        Takes a datetime object and returns a string
+        """
+        if isinstance(value, str):
+            return value
+        else:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=tzutc())
+            return value.astimezone(tzutc()).strftime(DATETIME_FORMAT)
+
+    def deserialize(self, value):
+        """
+        Takes a iso8601 datetime string and returns a datetime object
+        """
+        return datetime.strptime(value, DATETIME_FORMAT)
+
+
 class DurableHistoricalModel(object):
-    pass
+    eventTime = EventTimeAttribute(range_key=True, default=datetime.utcnow())
 
 
 class CurrentHistoricalModel(object):
-    pass
+    eventTime = EventTimeAttribute(default=datetime.utcnow())
 
 
 class AWSHistoricalMixin(object):
-    eventTime = UTCDateTimeAttribute(range_key=True, default=datetime.utcnow())
     arn = UnicodeAttribute(hash_key=True)
     accountId = UnicodeAttribute()
     userIdentity = JSONAttribute(null=True)

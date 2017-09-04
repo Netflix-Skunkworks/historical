@@ -69,7 +69,8 @@ class KinesisRecordsFactory(Factory):
 
 
 class DynamoDBData(object):
-    def __init__(self, NewImage, Keys):
+    def __init__(self, NewImage, OldImage, Keys):
+        self.OldImage = {k: seria.serialize(v) for k, v in OldImage.items()}
         self.NewImage = {k: seria.serialize(v) for k, v in NewImage.items()}
         self.Keys = {k: seria.serialize(v) for k, v in Keys.items()}
 
@@ -80,6 +81,7 @@ class DynamoDBDataFactory(Factory):
 
     NewImage = {}
     Keys = {}
+    OldImage = {}
 
 
 class DynamoDBRecord(object):
@@ -127,7 +129,7 @@ class EventFactory(Factory):
     class Meta:
         model = Event
 
-    account = '123456789010'
+    account = '123456789012'
     region = 'us-east-1'
     time = FuzzyDateTime(datetime.datetime.utcnow().replace(tzinfo=pytz.utc))
 
@@ -147,9 +149,9 @@ class SessionIssuerFactory(Factory):
 
     userName = FuzzyText()
     type = 'Role'
-    arn = 'arn:aws:iam::123456789010:role/historical_poller'
+    arn = 'arn:aws:iam::123456789012:role/historical_poller'
     principalId = 'AROAIKELBS2RNWG7KASDF'
-    accountId = '123456789010'
+    accountId = '123456789012'
 
 
 class UserIdentity(object):
@@ -167,7 +169,7 @@ class UserIdentityFactory(Factory):
 
 
 class Detail(object):
-    def __init__(self, eventTime, awsEventType, awsRegion, userIdentity, id, source, requestParameters):
+    def __init__(self, eventTime, awsEventType, awsRegion, eventName, userIdentity, id, source, requestParameters):
         self.eventTime = eventTime
         self.awsRegion = awsRegion
         self.awsEventType = awsEventType
@@ -175,6 +177,7 @@ class Detail(object):
         self.id = id
         self.source = source
         self.requestParameters = requestParameters
+        self.eventName = eventName
 
 
 class DetailFactory(Factory):
@@ -185,6 +188,7 @@ class DetailFactory(Factory):
     awsEventType = 'AwsApiCall'
     userIdentity = SubFactory(UserIdentityFactory)
     id = FuzzyText()
+    eventName = ''
     requestParameters = dict()
     source = 'aws.ec2'
     awsRegion = 'us-east-1'

@@ -17,7 +17,7 @@ logging.basicConfig()
 log = logging.getLogger('historical')
 log.setLevel(logging.INFO)
 
-EPHEMERAL_PATHS = {"root['attribute_values']['eventTime']"}
+EPHEMERAL_PATHS = ["root['attribute_values']['eventTime']", "root['RANGE']"]
 
 
 def is_new_revision(latest_revision, current_revision):
@@ -64,6 +64,12 @@ def handler(event, context):
                     log.debug('Difference found saving new revision to durable table.')
 
         if record['eventName'] == 'REMOVE':
-            current_revision = DurableSecurityGroupModel(configuration={})
-            current_revision.save()
+            old = record['dynamodb']['OldImage']
+
+            data = {}
+            for item in old:
+                data[item] = deser.deserialize(old[item])
+
+            data['configuration'] = {}
+            DurableSecurityGroupModel(**data).save()
             log.debug('Adding deletion marker.')

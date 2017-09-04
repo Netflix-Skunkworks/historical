@@ -50,5 +50,5 @@ def test_get_account_id():
     from historical.common.cloudwatch import get_account_id
     event = CloudwatchEventFactory()
     data = json.loads(json.dumps(event, default=serialize))
-    assert get_account_id(data) == '123456789010'
+    assert get_account_id(data) == '123456789012'
 
