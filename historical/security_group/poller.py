@@ -14,6 +14,7 @@ from cloudaux.aws.ec2 import describe_security_groups
 from swag_client.backend import SWAGManager
 from swag_client.util import parse_swag_config_options
 
+from historical.security_group.models import security_group_polling_schema
 from historical.common.kinesis import produce_events
 
 logging.basicConfig()
@@ -46,8 +47,12 @@ def handler(event, context):
         accounts = os.environ['ENABLED_ACCOUNTS']
 
     for account in accounts:
-        groups = describe_security_groups(account_number=account['id'], assume_role=os.environ['HISTORICAL_ROLE'], region=os.environ['AWS_DEFAULT_REGION'])
-        events = [{'group_id': g['GroupId'], 'owner_id': g['OwnerId']} for g in groups['SecurityGroups']]
+        groups = describe_security_groups(
+            account_number=account['id'],
+            assume_role=os.environ['HISTORICAL_ROLE'],
+            region=os.environ['AWS_DEFAULT_REGION']
+        )
+        events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
         produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupEventStream'))
 
         log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))

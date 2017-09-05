@@ -44,7 +44,8 @@ UPDATE_EVENTS = [
     'AuthorizeSecurityGroupIngress',
     'RevokeSecurityGroupEgress',
     'RevokeSecurityGroupIngress',
-    'CreateSecurityGroup'
+    'CreateSecurityGroup',
+    'HistoricalPoller'
 ]
 
 DELETE_EVENTS = [
