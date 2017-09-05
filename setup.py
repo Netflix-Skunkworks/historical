@@ -34,7 +34,7 @@ install_requires = [
     'cloudaux',
     'raven-python-lambda',
     'marshmallow==2.13.5',
-    'swag_client==0.2.9'
+    'swag-client==0.2.9'
 
 ]
 
