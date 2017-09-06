@@ -7,14 +7,15 @@
 """
 import logging
 import os
+from itertools import groupby
+from datetime import datetime
 
+from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
-from cloudaux.aws.sqs import get_queue_url, receive_message
 
-from historical.common.cloudwatch import filter_request_parameters, get_region, get_user_identity, get_principal, \
-    get_event_time, get_account_id
-from historical.common.events import determine_event_type
+from historical.common import cloudwatch
+from historical.common.kinesis import deserialize_records
 from historical.s3.models import CurrentS3Model
 
 logging.basicConfig()
@@ -22,67 +23,43 @@ log = logging.getLogger('historical')
 log.setLevel(logging.INFO)
 
 
-def get_configuration_data(data):
-    """Describes the current state of the object."""
-    return get_bucket(**data)
+UPDATE_EVENTS = [
+    "DescribeBucket",   # Polling event
+    "DeleteBucketCors",
+    "DeleteBucketLifecycle",
+    "DeleteBucketPolicy",
+    "DeleteBucketReplication",
+    "DeleteBucketTagging",
+    "DeleteBucketWebsite",
+    "CreateBucket",
+    "PutBucketAcl",
+    "PutBucketCors",
+    "PutBucketLifecycle",
+    "PutBucketPolicy",
+    "PutBucketLogging",
+    "PutBucketNotification",
+    "PutBucketReplication",
+    "PutBucketTagging",
+    "PutBucketRequestPayment",
+    "PutBucketVersioning",
+    "PutBucketWebsite"
+]
 
 
-def process_cloudwatch_event(event):
-    """Use cloudwatch event data to describe configuration data."""
-    log.debug("Processing S3 CloudWatch event...")
-    bucket_name = filter_request_parameters('bucketName', event)
-
-    data = dict(
-        aws_region=get_region(event),
-        user_identity=get_user_identity(event),
-        principal_id=get_principal(event),
-        event_time=get_event_time(event),
-        bucket_name=bucket_name,
-        aws_account_id=get_account_id(event)
-    )
-
-    if event.get('eventName') == 'DeleteBucket':
-        data['revision'] = {}
-
-    else:
-        bucket = get_bucket(bucket_name,
-                            account_number=data["aws_account_id"],
-                            assume_role=os.environ["HISTORICAL_ROLE"],
-                            session_name="historical-cloudwatch-S3",
-                            region=data["aws_region"])
-
-        data['revision'] = bucket
-
-    log.debug('Successfully processed CloudWatch Event. Data: {data}'.format(data=data[0]))
-
-    current_revision = CurrentS3Model(**data)
-    current_revision.save()
-    log.debug('Successfully updated current Historical table')
+DELETE_EVENTS = [
+    "DeleteBucket",
+]
 
 
-def process_polling_event():
-    log.debug("Processing S3 Polling event...")
-
-    # For S3, we will always grab from the restrictor -- due to the way that S3 bucket info grabbing works,
-    # since it has to call a bunch of APIs to completely describe a bucket.
-    log.debug('Fetching items from S3 source queue. QueueName: {}'.format(os.environ['SOURCE_QUEUE']))
-    url = get_queue_url(QueueName=os.environ['SOURCE_QUEUE'])
-    events = receive_message(QueueUrl=url, MaxNumberOfMessage=os.environ.get("MAX_QUEUE_FETCH", 25))
-    log.debug('Items found in queue. Number of Events: {}'.format(len(events)))
-
-    for event in events:
-        event_data = {}  # Process the polling event here...
-        log.debug('Successfully processed event. Data: {data}'.format(data=event_data))
-
-        current_revision = CurrentS3Model(**event_data)
-        current_revision.save()
-        log.debug('Successfully updated current Historical table')
-
-        log.debug("Removing event from SQS queue...")
-        # Delete the event from the SQS queue...
-        log.debug("Removed event from SQS queue.")
-
-    log.debug("Successfully processed S3 polling event.")
+def group_records_by_type(records):
+    """Break records into two lists; create/update events and delete events."""
+    update_records, delete_records = [], []
+    for r in records:
+        if r['detail']['eventName'] in UPDATE_EVENTS:
+            update_records.append(r)
+        else:
+            delete_records.append(r)
+    return update_records, delete_records
 
 
 @RavenLambdaWrapper()
@@ -91,17 +68,82 @@ def handler(event, context):
     Historical S3 event collector.
 
     This collector is responsible for processing CloudWatch events and polling events.
-
-    Polling Events:
-    When a polling event is received, this function is responsible for persisting
-    configuration data to the correct DynamoDB tables.
-
-    CloudWatch Events:
-    When a CloudWatch event is received, this function must first fetch configuration
-    data from AWS before persisting data.
     """
-    event_type = determine_event_type(event, "aws.s3")
-    if event_type == 'cloudwatch':
-        process_cloudwatch_event(event)
-    else:
-        process_polling_event()
+    records = deserialize_records(event['Records'])
+
+    # Split records into two groups, update and delete.
+    # We don't want to query for deleted records.
+    update_records, delete_records = group_records_by_type(records)
+
+    events = sorted(update_records, key=lambda x: x['account'])
+
+    # group records by account for more efficient processing
+    for account_id, events in groupby(events, lambda x: x['account']):
+        events = list(events)
+
+        # Grab the bucket names (de-dupe events):
+        buckets = {}
+        for e in events:
+            # If the creation date is present, then use it:
+            bucket_event = buckets.get(e["detail"]["requestParameters"]["bucketName"], {
+                "creationDate": e["detail"]["requestParameters"].get("creationDate")
+            })
+            bucket_event.update(e["detail"]["requestParameters"])
+
+            buckets[e["detail"]["requestParameters"]["bucketName"]] = bucket_event
+            buckets[e["detail"]["requestParameters"]["bucketName"]]["eventDetails"] = e
+
+        # query AWS for current configuration
+        for b, item in buckets.items():
+            # If the bucket does not exist, then simply drop the request --
+            # If this happens, there is likely a Delete event that has occurred and will be processed soon.
+            try:
+                bucket_details = get_bucket(b,
+                                            account_number=account_id,
+                                            include_created=(item.get("creationDate") is None),
+                                            assume_role=os.environ["HISTORICAL_ROLE"])
+            except ClientError as ce:
+                if ce.response["Error"]["Code"] == "NoSuchBucket":
+                    log.warn("Received update request for bucket: {} that does not currently exist. Skipping.".format(
+                        b
+                    ))
+                    continue
+
+            # Pull out the fields we want:
+            data = {
+                "arn": "arn:aws:s3:::{}".format(b),
+                "principalId": cloudwatch.get_principal(item["eventDetails"]),
+                "userIdentity": cloudwatch.get_user_identity(item["eventDetails"]),
+                "accountId": account_id,
+                "eventTime": item["eventDetails"]["detail"]["eventTime"],
+                "BucketName": b,
+                "Region": bucket_details["Region"],
+                "Tags": bucket_details["Tags"] or {}
+            }
+
+            # Remove the fields we care/don't care about:
+            del bucket_details["Arn"]
+            del bucket_details["GrantReferences"]
+            del bucket_details["Region"]
+            del bucket_details["Tags"]
+
+            if not bucket_details.get("CreationDate"):
+                bucket_details["CreationDate"] = item["creationDate"]
+
+            data["configuration"] = bucket_details
+
+            current_revision = CurrentS3Model(**data)
+            current_revision.save()
+
+    for r in delete_records:
+        arn = "arn:aws:s3:::{}".format(r['detail']['requestParameters']['bucketName'])
+
+        # Need to check if the event is NEWER than the previous event in case
+        # events are out of order. This could *possibly* happen if something
+        # was deleted, and then quickly re-created. It could be *possible* for the
+        # deletion event to arrive after the creation event. Thus, this will check
+        # if the current event timestamp is newer and will only delete if the deletion
+        # event is newer.
+        CurrentS3Model(arn=arn).delete(eventTime__le=r["detail"]["eventTime"])
+
+    log.debug('Successfully updated current Historical table')

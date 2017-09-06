@@ -76,11 +76,11 @@ class EventTimeAttribute(Attribute):
 
 
 class DurableHistoricalModel(object):
-    eventTime = EventTimeAttribute(range_key=True, default=datetime.utcnow())
+    pass    # Placeholder for future changes.
 
 
 class CurrentHistoricalModel(object):
-    eventTime = EventTimeAttribute(default=datetime.utcnow())
+    pass    # Placeholder for future changes.
 
 
 class AWSHistoricalMixin(object):
@@ -89,6 +89,7 @@ class AWSHistoricalMixin(object):
     userIdentity = JSONAttribute(null=True)
     principalId = UnicodeAttribute(null=True)
     configuration = ConfigurationAttribute()
+    eventTime = EventTimeAttribute(range_key=True, default=datetime.utcnow())
 
 
 class HistoricalPollingEventDetail(Schema):
@@ -101,7 +102,7 @@ class HistoricalPollingEventDetail(Schema):
 
     @post_dump()
     def add_required_data(self, data):
-        data["eventTime"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + 'Z'
+        data["eventTime"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
 
         return data
 
@@ -121,8 +122,6 @@ class HistoricalPollingBaseModel(Schema):
     def add_required_data(self, data):
         data["detail-type"] = "Historical Polling Event"
         data["source"] = "historical"
-        data["time"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + 'Z'
+        data["time"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
 
         return data
-
-

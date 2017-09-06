@@ -35,12 +35,11 @@ install_requires = [
     'raven-python-lambda',
     'marshmallow==2.13.5',
     'swag-client==0.2.9'
-
 ]
 
 tests_require = [
     'pytest==3.1.3',
-    'moto==1.0.1',
+    'moto==1.1.2',
     'coveralls==1.1',
     'factory-boy==2.9.2'
 ]
@@ -68,5 +67,3 @@ setup(
     },
     keywords=['aws', 'account_management']
 )
-
-

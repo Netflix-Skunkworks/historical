@@ -26,7 +26,7 @@ def get_record(all_buckets, index, account):
     return {
         "Data": bytes(s3_polling_schema.serialize_me(account, {
             "bucket_name": all_buckets[index]["Name"],
-            "creation_date": all_buckets[index]["CreationDate"].replace(tzinfo=None).isoformat()
+            "creation_date": all_buckets[index]["CreationDate"].replace(tzinfo=None, microsecond=0).isoformat() + "Z"
         }), "utf-8"),
         "PartitionKey": uuid.uuid4().hex
     }
