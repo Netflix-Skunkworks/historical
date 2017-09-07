@@ -39,20 +39,20 @@ def handler(event, context):
             'swag.type': 's3',
             'swag.bucket_name': os.environ['SWAG_BUCKET'],
             'swag.data_file': os.environ.get('SWAG_DATA_FILE', 'accounts.json'),
-            'swag.region': os.environ.get('SWAG_BUCKET_REGION', 'us-east-1')
+            'swag.region': os.environ.get('SWAG_REGION', 'us-east-1')
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = swag.get_all()
+        accounts = swag.get_all("[?provider=='aws']")
     else:
         accounts = os.environ['ENABLED_ACCOUNTS']
 
     for account in accounts:
         groups = describe_security_groups(
             account_number=account['id'],
-            assume_role=os.environ['HISTORICAL_ROLE'],
+            assume_role=os.environ.get('HISTORICAL_ROLE', 'Historical'),
             region=os.environ['AWS_DEFAULT_REGION']
         )
         events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
-        produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupEventStream'))
+        produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupStream'))
 
         log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))

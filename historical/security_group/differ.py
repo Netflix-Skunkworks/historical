@@ -56,7 +56,7 @@ def handler(event, context):
             elif record['eventName'] == 'MODIFY':
                 # We want the newest items first.
                 # See: http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
-                latest_revision = list(DurableSecurityGroupModel.query(arn, scan_index_forward=False, limit=1))[0]
+                latest_revision = list(DurableSecurityGroupModel.query(arn, eventTime__begins_with='2017-09-07', scan_index_forward=False, limit=1))[0]
 
                 # determine if there is truly a difference, disregarding ephemeral_paths
                 if is_new_revision(latest_revision, current_revision):

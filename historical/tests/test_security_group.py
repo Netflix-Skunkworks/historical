@@ -235,7 +235,7 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
     from historical.security_group.collector import handler
     event = CloudwatchEventFactory(
         detail=DetailFactory(
-            requestParameters={'GroupId': security_groups['GroupId']},
+            requestParameters={'groupId': security_groups['GroupId']},
             eventName='CreateSecurityGroup'
         ),
     )
@@ -255,7 +255,7 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
 
     event = CloudwatchEventFactory(
         detail=DetailFactory(
-            requestParameters={'GroupId': security_groups['GroupId']},
+            requestParameters={'groupId': security_groups['GroupId']},
             eventName='DeleteSecurityGroup'
         ),
     )

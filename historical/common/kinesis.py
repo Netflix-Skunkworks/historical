@@ -34,7 +34,7 @@ def produce_events(events, stream):
 
     events = [
         {
-            'Data': json.dumps(event).encode('utf-8'),
+            'Data': event.encode('utf-8'),
             'PartitionKey': uuid.uuid4().hex
         } for event in events
     ]

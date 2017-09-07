@@ -26,12 +26,12 @@ class SecurityGroupModel(object):
 
 class DurableSecurityGroupModel(Model, DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
-        table_name = 'historical-durable-security-group'
+        table_name = 'HistoricalSecurityGroupDurableTable'
 
 
 class CurrentSecurityGroupModel(Model, CurrentHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
-        table_name = 'historical-current-security-group'
+        table_name = 'HistoricalSecurityGroupCurrentTable'
 
 
 class ViewIndex(GlobalSecondaryIndex):
@@ -42,29 +42,33 @@ class ViewIndex(GlobalSecondaryIndex):
 
 
 class SecurityGroupPollingRequestParamsModel(Schema):
-    group_id = fields.Str(dump_to="GroupId", load_from="GroupId", required=True)
-    owner_id = fields.Str(dump_to="OwnerId", load_from="OwnerId", required=True)
+    group_id = fields.Str(dump_to='groupId', load_from='groupId', required=True)
+    owner_id = fields.Str(dump_to='ownerId', load_from='ownerId', required=True)
 
 
 class SecurityGroupPollingEventDetail(HistoricalPollingEventDetail):
     @post_dump
     def add_required_security_group_polling_data(self, data):
-        data["eventSource"] = "historical.ec2.poller"
-        data["eventName"] = "HistoricalPoller"
+        data['eventSource'] = 'historical.ec2.poller'
+        data['eventName'] = 'HistoricalPoller'
         return data
 
 
 class SecurityGroupPollingEventModel(HistoricalPollingBaseModel):
+    detail = fields.Nested(SecurityGroupPollingEventDetail, required=True)
+
     @post_dump()
     def dump_security_group_polling_event_data(self, data):
-        data["version"] = "1"
+        data['version'] = '1'
         return data
 
     def serialize(self, account, group):
         return self.dumps({
-            "account": account,
-            "detail": {
-                "requestParameters": group
+            'account': account,
+            'detail': {
+                'request_parameters': {
+                    'groupId': group['GroupId']
+                }
             }
         }).data
 
