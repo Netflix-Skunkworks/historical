@@ -146,3 +146,16 @@ def durable_security_group_table():
     mock_dynamodb2().start()
     yield DurableSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
     mock_dynamodb2().stop()
+
+
+@pytest.fixture()
+def current_s3_table(dynamodb):
+    from historical.s3.models import CurrentS3Model
+    yield CurrentS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
+
+
+@pytest.fixture()
+def durable_s3_table(dynamodb):
+    from historical.s3.models import DurableS3Model
+    yield DurableS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
+

@@ -14,9 +14,9 @@ from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AW
 
 
 class S3Model(object):
-    bucket_name = UnicodeAttribute()
-    aws_region = UnicodeAttribute()
-    tags = JSONAttribute()
+    BucketName = UnicodeAttribute()
+    Region = UnicodeAttribute()
+    Tags = JSONAttribute()
 
 
 class DurableS3Model(Model, DurableHistoricalModel, AWSHistoricalMixin, S3Model):
