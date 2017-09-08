@@ -101,7 +101,7 @@ class HistoricalPollingEventDetail(Schema):
 
     @post_dump()
     def add_required_data(self, data):
-        data["eventTime"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat()
+        data["eventTime"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + 'Z'
 
         return data
 
@@ -121,7 +121,7 @@ class HistoricalPollingBaseModel(Schema):
     def add_required_data(self, data):
         data["detail-type"] = "Historical Polling Event"
         data["source"] = "historical"
-        data["time"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat()
+        data["time"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + 'Z'
 
         return data
 

@@ -18,7 +18,7 @@ from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AW
 class SecurityGroupModel(object):
     GroupId = UnicodeAttribute()
     GroupName = UnicodeAttribute()
-    VpcId = UnicodeAttribute()
+    VpcId = UnicodeAttribute(null=True)
     OwnerId = UnicodeAttribute()
     Description = UnicodeAttribute()
     Tags = JSONAttribute()

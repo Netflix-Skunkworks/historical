@@ -9,13 +9,14 @@ import logging
 from boto3.dynamodb.types import TypeDeserializer
 from deepdiff import DeepDiff
 
+from raven_python_lambda import RavenLambdaWrapper
 from historical.security_group.models import DurableSecurityGroupModel
 
 deser = TypeDeserializer()
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-log.setLevel(logging.INFO)
+log.setLevel(logging.WARNING)
 
 EPHEMERAL_PATHS = ["root['attribute_values']['eventTime']", "root['RANGE']"]
 
@@ -31,6 +32,7 @@ def is_new_revision(latest_revision, current_revision):
     return diff
 
 
+@RavenLambdaWrapper()
 def handler(event, context):
     """
     Historical security group event differ.
@@ -56,12 +58,16 @@ def handler(event, context):
             elif record['eventName'] == 'MODIFY':
                 # We want the newest items first.
                 # See: http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
-                latest_revision = list(DurableSecurityGroupModel.query(arn, eventTime__begins_with='2017-09-07', scan_index_forward=False, limit=1))[0]
+                items = list(DurableSecurityGroupModel.query(arn, eventTime__le=data['eventTime'], scan_index_forward=False, limit=1))
+                if items:
+                    latest_revision = items[0]
 
-                # determine if there is truly a difference, disregarding ephemeral_paths
-                if is_new_revision(latest_revision, current_revision):
-                    current_revision.save()
-                    log.debug('Difference found saving new revision to durable table.')
+                    # determine if there is truly a difference, disregarding ephemeral_paths
+                    if is_new_revision(latest_revision, current_revision):
+                        current_revision.save()
+                        log.debug('Difference found saving new revision to durable table.')
+                else:
+                    log.warning('Got modify event but no current revision found. Record: {record}'.format(record=record))
 
         if record['eventName'] == 'REMOVE':
             old = record['dynamodb']['OldImage']

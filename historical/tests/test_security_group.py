@@ -143,12 +143,12 @@ def test_poller(historical_kinesis, historical_role, mock_lambda_environment, se
     assert len(records['Records']) == 3
 
 
-def test_differ(durable_security_group_table):
+def test_differ(durable_security_group_table, mock_lambda_environment):
     from historical.security_group.models import DurableSecurityGroupModel
     from historical.security_group.differ import handler
 
     new_group = SECURITY_GROUP.copy()
-    new_group['eventTime'] = datetime(2017, 5, 12, 23, 30).isoformat() + 'Z'
+    new_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -168,7 +168,7 @@ def test_differ(durable_security_group_table):
     assert DurableSecurityGroupModel.count() == 1
 
     duplicate_group = SECURITY_GROUP.copy()
-    duplicate_group['eventTime'] = datetime(2017, 5, 12, 10, 30).isoformat() + 'Z'
+    duplicate_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
 
     # ensure no new record for the same data
     data = DynamoDBRecordsFactory(
@@ -189,7 +189,7 @@ def test_differ(durable_security_group_table):
     assert DurableSecurityGroupModel.count() == 1
 
     updated_group = SECURITY_GROUP.copy()
-    updated_group['eventTime'] = datetime(2017, 5, 12, 11, 30).isoformat() + 'Z'
+    updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_group['Description'] = 'changeme'
     data = DynamoDBRecordsFactory(
         records=[
@@ -209,7 +209,7 @@ def test_differ(durable_security_group_table):
     assert DurableSecurityGroupModel.count() == 2
 
     deleted_group = SECURITY_GROUP.copy()
-    deleted_group['eventTime'] = datetime(2017, 5, 12, 12, 30).isoformat() + 'Z'
+    deleted_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
 
     # ensure new record
     data = DynamoDBRecordsFactory(

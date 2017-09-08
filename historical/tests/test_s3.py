@@ -53,7 +53,7 @@ def test_durable_table():
     pass
 
 
-def test_poller(historical_role, buckets, mock_lambda_context, historical_kinesis, swag_accounts):
+def test_poller(historical_role, buckets, mock_lambda_context, mock_lambda_environment, historical_kinesis, swag_accounts):
     from historical.s3.poller import handler
     os.environ["MAX_BUCKET_BATCH"] = "4"
     handler({}, mock_lambda_context)

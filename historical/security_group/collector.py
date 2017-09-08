@@ -20,7 +20,7 @@ from historical.security_group.models import CurrentSecurityGroupModel
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.WARNING)
 
 
 UPDATE_EVENTS = [
@@ -130,7 +130,7 @@ def capture_update_records(records):
             'GroupId': group['GroupId'],
             'GroupName': group['GroupName'],
             'Description': group['Description'],
-            'VpcId': group['VpcId'],
+            'VpcId': group.get('VpcId'),
             'Tags': group.get('Tags', []),
             'principalId': cloudwatch.get_principal(record),
             'arn': get_arn(group['GroupId'], group['OwnerId']),

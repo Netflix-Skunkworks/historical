@@ -28,18 +28,18 @@ def filter_request_parameters(field_name, msg):
 
 def get_user_identity(event):
     """Gets event identity from event."""
-    return event['detail']['userIdentity']
+    return event['detail'].get('userIdentity', {})
 
 
 def get_principal(event):
     """Gets principal id from event"""
     ui = get_user_identity(event)
-    return ui['principalId'].split(':')[-1]
+    return ui.get('principalId', '').split(':')[-1]
 
 
 def get_region(event):
     """Get region from event details."""
-    return event['detail']['awsRegion']
+    return event['detail'].get('awsRegion')
 
 
 def get_event_time(event):
