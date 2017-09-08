@@ -62,7 +62,7 @@ def handler(event, context):
                 if items:
                     latest_revision = items[0]
 
-                    # determine if there is truly a difference, disregarding ephemeral_paths
+                    # Determine if there is truly a difference, disregarding Ephemeral Paths
                     if is_new_revision(latest_revision, current_revision):
                         current_revision.save()
                         log.debug('Difference found saving new revision to durable table.')
