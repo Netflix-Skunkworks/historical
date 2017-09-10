@@ -12,9 +12,11 @@ from historical.tests.factories import (
     KinesisDataFactory,
     KinesisRecordFactory,
     KinesisRecordsFactory,
-    serialize
+    serialize,
+    DynamoDBDataFactory,
+    DynamoDBRecordFactory,
+    DynamoDBRecordsFactory
 )
-
 
 S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
@@ -156,10 +158,6 @@ def test_poller(historical_role, buckets, mock_lambda_context, mock_lambda_envir
     assert len(all_buckets) == 0
 
 
-def test_differ():
-    assert True
-
-
 def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_environment, swag_accounts,
                    current_s3_table):
     from historical.s3.collector import handler
@@ -238,7 +236,7 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
 
 
 def test_collector_deletion_order(historical_role, buckets, mock_lambda_context, mock_lambda_environment, swag_accounts,
-                   current_s3_table):
+                                  current_s3_table):
     from historical.s3.collector import handler
 
     # Will create two events -- A deletion event that occurs BEFORE the creation event,
@@ -246,8 +244,56 @@ def test_collector_deletion_order(historical_role, buckets, mock_lambda_context,
     # The end result should be that the current table remain the same -- the deletion
     # event should NOT delete the existing configuration
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
-    five_min_prev = (datetime.now() - timedelta(minutes=15))\
-        .replace(tzinfo=None, microsecond=0).isoformat() + "Z"
+    five_min_prev = (datetime.now() - timedelta(minutes=15)) \
+                        .replace(tzinfo=None, microsecond=0).isoformat() + "Z"
+
+    create_event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={
+                "bucketName": "testbucket1"
+            },
+            source="aws.s3",
+            eventName="CreateBucket",
+            eventTime=now
+        )
+    )
+    create_event_data = json.dumps(create_event, default=serialize)
+
+    delete_event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={
+                "bucketName": "testbucket1"
+            },
+            source="aws.s3",
+            eventName="DeleteBucket",
+            eventTime=five_min_prev
+        )
+    )
+    delete_event_data = json.dumps(delete_event, default=serialize)
+
+    data = KinesisRecordsFactory(
+        records=[
+            KinesisRecordFactory(
+                kinesis=KinesisDataFactory(data=create_event_data)),
+            KinesisRecordFactory(
+                kinesis=KinesisDataFactory(data=delete_event_data))
+        ]
+    )
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, mock_lambda_context)
+    assert CurrentS3Model.count() == 1
+
+
+def test_collector_error_event(historical_role, buckets, mock_lambda_context, mock_lambda_environment, swag_accounts,
+                               current_s3_table):
+    from historical.s3.collector import handler
+    # Should never process events that were errors.
+
+    now = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
+    five_min_prev = (datetime.now() - timedelta(minutes=15)) \
+                        .replace(tzinfo=None, microsecond=0).isoformat() + "Z"
 
     create_event = CloudwatchEventFactory(
         detail=DetailFactory(
@@ -314,3 +360,101 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_conte
 
     handler(data, mock_lambda_context)
     assert CurrentS3Model.count() == 0
+
+
+def test_differ(durable_s3_table, mock_lambda_environment):
+    from historical.s3.models import DurableS3Model
+    from historical.s3.differ import handler
+
+    new_bucket = S3_BUCKET.copy()
+    new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+    data = DynamoDBRecordsFactory(
+        records=[
+            DynamoDBRecordFactory(
+                dynamodb=DynamoDBDataFactory(
+                    NewImage=new_bucket,
+                    Keys={
+                        'arn': new_bucket['arn']
+                    }
+                ),
+                eventName='INSERT'
+            )
+        ]
+    )
+    data = json.loads(json.dumps(data, default=serialize))
+    handler(data, None)
+    assert DurableS3Model.count() == 1
+
+    # Test duplicates don't change anything:
+    handler(data, None)
+    assert DurableS3Model.count() == 1
+
+    # Test ephemeral changes don't add new models:
+    ephemeral_changes = S3_BUCKET.copy()
+    ephemeral_changes["eventTime"] =  \
+        datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
+    ephemeral_changes["configuration"]["_version"] = 99999
+    ephemeral_changes["principalId"] = "someoneelse@example.com"
+    ephemeral_changes["userIdentity"]["sessionContext"]["userName"] = "someoneelse"
+
+    data = DynamoDBRecordsFactory(
+        records=[
+            DynamoDBRecordFactory(
+                dynamodb=DynamoDBDataFactory(
+                    NewImage=ephemeral_changes,
+                    Keys={
+                        'arn': ephemeral_changes['arn']
+                    }
+                ),
+                eventName='MODIFY'
+            )
+        ]
+    )
+    data = json.loads(json.dumps(data, default=serialize))
+    handler(data, None)
+    assert DurableS3Model.count() == 1
+
+    # Add an update:
+    new_changes = S3_BUCKET.copy()
+    new_date = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
+    new_changes["eventTime"] = new_date
+    new_changes["Tags"] = {"ANew": "Tag"}
+    data = DynamoDBRecordsFactory(
+        records=[
+            DynamoDBRecordFactory(
+                dynamodb=DynamoDBDataFactory(
+                    NewImage=new_changes,
+                    Keys={
+                        'arn': new_changes['arn']
+                    }
+                ),
+                eventName='MODIFY'
+            )
+        ]
+    )
+    data = json.loads(json.dumps(data, default=serialize))
+    handler(data, None)
+    results = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
+    assert len(results) == 2
+    assert results[1].Tags["ANew"] == "Tag"
+    assert results[1].eventTime.isoformat() + 'Z' == new_date
+
+    # And deletion:
+    delete_bucket = S3_BUCKET.copy()
+    delete_bucket["eventTime"] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
+    data = DynamoDBRecordsFactory(
+        records=[
+            DynamoDBRecordFactory(
+                dynamodb=DynamoDBDataFactory(
+                    OldImage=delete_bucket,
+                    Keys={
+                        'arn': delete_bucket['arn']
+                    }
+                ),
+                eventName='REMOVE'
+            )
+        ]
+    )
+    data = json.loads(json.dumps(data, default=serialize))
+    handler(data, None)
+    assert DurableS3Model.count() == 3

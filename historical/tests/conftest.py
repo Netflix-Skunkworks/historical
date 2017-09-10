@@ -132,7 +132,7 @@ def mock_lambda_environment():
     os.environ['SENTRY_ENABLED'] = 'f'
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def current_security_group_table():
     from historical.security_group.models import CurrentSecurityGroupModel
     mock_dynamodb2().start()
@@ -140,7 +140,7 @@ def current_security_group_table():
     mock_dynamodb2().stop()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def durable_security_group_table():
     from historical.security_group.models import DurableSecurityGroupModel
     mock_dynamodb2().start()
@@ -148,13 +148,13 @@ def durable_security_group_table():
     mock_dynamodb2().stop()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def current_s3_table(dynamodb):
     from historical.s3.models import CurrentS3Model
     yield CurrentS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="function")
 def durable_s3_table(dynamodb):
     from historical.s3.models import DurableS3Model
     yield DurableS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)

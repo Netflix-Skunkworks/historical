@@ -8,7 +8,6 @@
 import logging
 import os
 from itertools import groupby
-from datetime import datetime
 
 from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
@@ -55,29 +54,36 @@ def group_records_by_type(records):
     """Break records into two lists; create/update events and delete events."""
     update_records, delete_records = [], []
     for r in records:
-        if r['detail']['eventName'] in UPDATE_EVENTS:
-            update_records.append(r)
-        else:
-            delete_records.append(r)
+
+        # Do not capture error events:
+        if not r["detail"].get("errorCode"):
+            if r['detail']['eventName'] in UPDATE_EVENTS:
+                update_records.append(r)
+            else:
+                delete_records.append(r)
+
     return update_records, delete_records
 
 
-@RavenLambdaWrapper()
-def handler(event, context):
-    """
-    Historical S3 event collector.
+def process_delete_records(delete_records):
+    """Process the requests for S3 bucket deletions"""
+    for r in delete_records:
+        arn = "arn:aws:s3:::{}".format(r['detail']['requestParameters']['bucketName'])
 
-    This collector is responsible for processing CloudWatch events and polling events.
-    """
-    records = deserialize_records(event['Records'])
+        # Need to check if the event is NEWER than the previous event in case
+        # events are out of order. This could *possibly* happen if something
+        # was deleted, and then quickly re-created. It could be *possible* for the
+        # deletion event to arrive after the creation event. Thus, this will check
+        # if the current event timestamp is newer and will only delete if the deletion
+        # event is newer.
+        CurrentS3Model(arn=arn).delete(eventTime__le=r["detail"]["eventTime"])
 
-    # Split records into two groups, update and delete.
-    # We don't want to query for deleted records.
-    update_records, delete_records = group_records_by_type(records)
 
+def process_update_records(update_records):
+    """Process the requests for S3 bucket update requests"""
     events = sorted(update_records, key=lambda x: x['account'])
 
-    # group records by account for more efficient processing
+    # Group records by account for more efficient processing
     for account_id, events in groupby(events, lambda x: x['account']):
         events = list(events)
 
@@ -126,6 +132,7 @@ def handler(event, context):
             del bucket_details["GrantReferences"]
             del bucket_details["Region"]
             del bucket_details["Tags"]
+            del bucket_details["Owner"]
 
             if not bucket_details.get("CreationDate"):
                 bucket_details["CreationDate"] = item["creationDate"]
@@ -135,15 +142,26 @@ def handler(event, context):
             current_revision = CurrentS3Model(**data)
             current_revision.save()
 
-    for r in delete_records:
-        arn = "arn:aws:s3:::{}".format(r['detail']['requestParameters']['bucketName'])
 
-        # Need to check if the event is NEWER than the previous event in case
-        # events are out of order. This could *possibly* happen if something
-        # was deleted, and then quickly re-created. It could be *possible* for the
-        # deletion event to arrive after the creation event. Thus, this will check
-        # if the current event timestamp is newer and will only delete if the deletion
-        # event is newer.
-        CurrentS3Model(arn=arn).delete(eventTime__le=r["detail"]["eventTime"])
+@RavenLambdaWrapper()
+def handler(event, context):
+    """
+    Historical S3 event collector.
+
+    This collector is responsible for processing CloudWatch events and polling events.
+    """
+    records = deserialize_records(event['Records'])
+
+    # Split records into two groups, update and delete.
+    # We don't want to query for deleted records.
+    update_records, delete_records = group_records_by_type(records)
+
+    log.debug("Processing update records...")
+    process_update_records(update_records)
+    log.debug("Completed processing of update records.")
+
+    log.debug("Processing delete records...")
+    process_delete_records(delete_records)
+    log.debug("Completed processing of delete records.")
 
     log.debug('Successfully updated current Historical table')
