@@ -21,12 +21,12 @@ class S3Model(object):
 
 class DurableS3Model(Model, DurableHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
-        table_name = 'historical-durable-s3'
+        table_name = 'HistoricalS3DurableTable'
 
 
 class CurrentS3Model(Model, CurrentHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
-        table_name = 'historical-current-s3'
+        table_name = 'HistoricalS3CurrentTable'
 
 
 class ViewIndex(GlobalSecondaryIndex):

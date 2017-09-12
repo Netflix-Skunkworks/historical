@@ -87,7 +87,7 @@ def handler(event, context):
             'swag.cache_expires': 0
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = [account["id"] for account in swag.get_all()]
+        accounts = [account["id"] for account in swag.get_all("[?provider=='aws']")]
     else:
         accounts = os.environ['ENABLED_ACCOUNTS']
 
