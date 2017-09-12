@@ -219,7 +219,8 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
                 "bucketName": "testbucket1"
             },
             source="aws.s3",
-            eventName="DeleteBucket"
+            eventName="DeleteBucket",
+            eventTime=datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
         )
     )
     data = json.dumps(delete_event, default=serialize)
@@ -244,8 +245,7 @@ def test_collector_deletion_order(historical_role, buckets, mock_lambda_context,
     # The end result should be that the current table remain the same -- the deletion
     # event should NOT delete the existing configuration
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
-    five_min_prev = (datetime.now() - timedelta(minutes=15)) \
-                        .replace(tzinfo=None, microsecond=0).isoformat() + "Z"
+    five_min_prev = (datetime.now() - timedelta(minutes=15)).replace(tzinfo=None, microsecond=0).isoformat() + "Z"
 
     create_event = CloudwatchEventFactory(
         detail=DetailFactory(
@@ -391,7 +391,7 @@ def test_differ(durable_s3_table, mock_lambda_environment):
 
     # Test ephemeral changes don't add new models:
     ephemeral_changes = S3_BUCKET.copy()
-    ephemeral_changes["eventTime"] =  \
+    ephemeral_changes["eventTime"] = \
         datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     ephemeral_changes["configuration"]["_version"] = 99999
     ephemeral_changes["principalId"] = "someoneelse@example.com"
