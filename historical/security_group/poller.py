@@ -8,6 +8,8 @@
 import os
 import logging
 
+from botocore.exceptions import ClientError
+
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
 
@@ -47,12 +49,18 @@ def handler(event, context):
         accounts = os.environ['ENABLED_ACCOUNTS']
 
     for account in accounts:
-        groups = describe_security_groups(
-            account_number=account['id'],
-            assume_role=os.environ.get('HISTORICAL_ROLE', 'Historical'),
-            region=os.environ['AWS_DEFAULT_REGION']
-        )
-        events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
-        produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupStream'))
+        try:
+            groups = describe_security_groups(
+                account_number=account['id'],
+                assume_role=os.environ.get('HISTORICAL_ROLE', 'Historical'),
+                region=os.environ['AWS_DEFAULT_REGION']
+            )
+            events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
+            produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupStream'))
+            log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))
+        except ClientError as e:
+            log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
+                account_id=account['id'],
+                reason=e
+            ))
 
-        log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))
