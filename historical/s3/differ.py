@@ -5,7 +5,6 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Mike Grima <mgrima@netflix.com>
 """
-import json
 import logging
 from boto3.dynamodb.types import TypeDeserializer
 from deepdiff import DeepDiff
@@ -41,9 +40,6 @@ def is_new_revision(latest_revision, current_revision):
         exclude_paths=EPHEMERAL_PATHS,
         ignore_order=True
     )
-    asdf = current_revision.__dict__
-    quer = latest_revision.__dict__
-    print(diff)
     return diff
 
 

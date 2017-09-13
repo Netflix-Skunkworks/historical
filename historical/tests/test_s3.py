@@ -3,7 +3,7 @@ import json
 import boto3
 import os
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from botocore.exceptions import ClientError
 
@@ -229,19 +229,6 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
     assert result[0].configuration["CreationDate"] == now.isoformat() + "Z"
 
     # And deletion:
-    # Moto doesn't do anything with conditional events. There is a HAIR PULLING test issue with the eventTime
-    # not being sent in, and tests sporadically failing. This ensures that Pynamo is sending over the
-    # correct time so that moto tests work:
-    import pynamodb.models
-    before_mock = pynamodb.models.Model._set_defaults
-
-    def mocked_method(*args, **kwargs):
-        before_mock(*args, **kwargs)
-        args[0]._attributes["eventTime"].default = now
-        args[0].eventTime = now
-
-    pynamodb.models.Model._set_defaults = mocked_method
-
     delete_event = CloudwatchEventFactory(
         detail=DetailFactory(
             requestParameters={
@@ -263,127 +250,6 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
     data = json.loads(data)
     handler(data, mock_lambda_context)
     assert CurrentS3Model.count() == 0
-    pynamodb.models.Model._set_defaults = before_mock
-
-
-def test_collector_deletion_order(historical_role, buckets, mock_lambda_context, mock_lambda_environment, swag_accounts,
-                                  current_s3_table):
-    from historical.s3.collector import handler
-
-    # Will create two events -- A deletion event that occurs BEFORE the creation event,
-    # but processed such that the deletion event arrives after the creation event.
-    # The end result should be that the current table remain the same -- the deletion
-    # event should NOT delete the existing configuration
-    now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
-    five_min_prev = (datetime.now() - timedelta(minutes=15)).replace(tzinfo=None, microsecond=0)
-
-    # Timestamps are annoying AF - Mike G
-    import pynamodb.models
-    before_mock = pynamodb.models.Model._set_defaults
-
-    def mocked_method(*args, **kwargs):
-        before_mock(*args, **kwargs)
-        args[0]._attributes["eventTime"].default = now
-        args[0].eventTime = five_min_prev
-
-    pynamodb.models.Model._set_defaults = mocked_method
-
-    create_event = CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            source="aws.s3",
-            eventName="CreateBucket",
-            eventTime=now
-        )
-    )
-    create_event_data = json.dumps(create_event, default=serialize)
-
-    delete_event = CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            source="aws.s3",
-            eventName="DeleteBucket",
-            eventTime=five_min_prev
-        )
-    )
-    delete_event_data = json.dumps(delete_event, default=serialize)
-
-    data = KinesisRecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=create_event_data)),
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=delete_event_data))
-        ]
-    )
-    data = json.dumps(data, default=serialize)
-    data = json.loads(data)
-
-    handler(data, mock_lambda_context)
-    assert CurrentS3Model.count() == 1
-    pynamodb.models.Model._set_defaults = before_mock
-
-
-def test_collector_error_event(historical_role, buckets, mock_lambda_context, mock_lambda_environment, swag_accounts,
-                               current_s3_table):
-    from historical.s3.collector import handler
-    now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
-    five_min_prev = (datetime.now() - timedelta(minutes=15)).replace(tzinfo=None, microsecond=0)
-    # Should never process events that were errors.
-
-    # Timestamps are annoying AF - Mike G
-    import pynamodb.models
-    before_mock = pynamodb.models.Model._set_defaults
-
-    def mocked_method(*args, **kwargs):
-        before_mock(*args, **kwargs)
-        args[0]._attributes["eventTime"].default = now
-        args[0].eventTime = five_min_prev
-
-    pynamodb.models.Model._set_defaults = mocked_method
-
-    create_event = CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            source="aws.s3",
-            eventName="CreateBucket",
-            eventTime=now
-        )
-    )
-    create_event_data = json.dumps(create_event, default=serialize)
-
-    delete_event = CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            source="aws.s3",
-            eventName="DeleteBucket",
-            eventTime=five_min_prev
-        )
-    )
-    delete_event_data = json.dumps(delete_event, default=serialize)
-
-    data = KinesisRecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=create_event_data)),
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=delete_event_data))
-        ]
-    )
-    data = json.dumps(data, default=serialize)
-    data = json.loads(data)
-
-    handler(data, mock_lambda_context)
-    assert CurrentS3Model.count() == 1
-    pynamodb.models.Model._set_defaults = before_mock
 
 
 def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_context, mock_lambda_environment,

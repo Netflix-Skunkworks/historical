@@ -10,6 +10,7 @@ import os
 from itertools import groupby
 
 from botocore.exceptions import ClientError
+from pynamodb.exceptions import DeleteError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 
@@ -76,7 +77,12 @@ def process_delete_records(delete_records):
         # deletion event to arrive after the creation event. Thus, this will check
         # if the current event timestamp is newer and will only delete if the deletion
         # event is newer.
-        CurrentS3Model(arn=arn).delete(eventTime__le=r["detail"]["eventTime"])
+        try:
+            print("Deleting bucket: {}".format(arn))
+            CurrentS3Model(arn=arn).delete(eventTime__le=r["detail"]["eventTime"])
+        except DeleteError as _:
+            log.warn("Unable to delete bucket: {}. Either it doesn't exist, or this deletion event "
+                     "arrived after a creation/update.".format(arn))
 
 
 def process_update_records(update_records):
@@ -101,6 +107,7 @@ def process_update_records(update_records):
 
         # query AWS for current configuration
         for b, item in buckets.items():
+            print("Processing Create/Update for: {}".format(b))
             # If the bucket does not exist, then simply drop the request --
             # If this happens, there is likely a Delete event that has occurred and will be processed soon.
             try:
@@ -108,6 +115,11 @@ def process_update_records(update_records):
                                             account_number=account_id,
                                             include_created=(item.get("creationDate") is None),
                                             assume_role=os.environ["HISTORICAL_ROLE"])
+                if bucket_details.get("Error"):
+                    log.error("Unable to fetch details about bucket: {}. "
+                              "The error details are: {}".format(b, bucket_details["Error"]))
+                    continue
+
             except ClientError as ce:
                 if ce.response["Error"]["Code"] == "NoSuchBucket":
                     log.warn("Received update request for bucket: {} that does not currently exist. Skipping.".format(
@@ -127,7 +139,7 @@ def process_update_records(update_records):
                 "Tags": bucket_details["Tags"] or {}
             }
 
-            # Remove the fields we care/don't care about:
+            # Remove the fields we don't care about:
             del bucket_details["Arn"]
             del bucket_details["GrantReferences"]
             del bucket_details["Region"]
