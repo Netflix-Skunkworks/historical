@@ -9,6 +9,7 @@ import logging
 import os
 import uuid
 
+from botocore.exceptions import ClientError
 from cloudaux.aws.s3 import list_buckets
 from raven_python_lambda import RavenLambdaWrapper
 from swag_client.backend import SWAGManager
@@ -92,6 +93,13 @@ def handler(event, context):
         accounts = os.environ['ENABLED_ACCOUNTS']
 
     for account in accounts:
-        create_polling_event(account)
+        # Skip accounts that have role assumption errors:
+        try:
+            create_polling_event(account)
+        except ClientError as e:
+            log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
+                account_id=account,
+                reason=e
+            ))
 
     log.debug('Finished generating polling events. Events Created: {}'.format(len(accounts)))
