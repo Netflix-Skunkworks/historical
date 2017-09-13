@@ -115,8 +115,6 @@ class DynamoDBRecordsFactory(Factory):
                 self.Records.append(record)
 
 
-
-
 class Event(object):
     def __init__(self, account, region, time):
         self.account = account
@@ -184,7 +182,7 @@ class DetailFactory(Factory):
     class Meta:
         model = Detail
 
-    eventTime = FuzzyDateTime(datetime.datetime.utcnow().replace(tzinfo=pytz.utc))
+    eventTime = FuzzyDateTime(datetime.datetime.utcnow().replace(tzinfo=pytz.utc, microsecond=0))
     awsEventType = 'AwsApiCall'
     userIdentity = SubFactory(UserIdentityFactory)
     id = FuzzyText()

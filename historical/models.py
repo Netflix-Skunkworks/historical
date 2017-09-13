@@ -6,8 +6,6 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 .. author:: Mike Grima <mgrima@netflix.com>
 """
-import decimal
-import json
 from datetime import datetime
 from dateutil.tz import tzutc
 from pynamodb.attributes import JSONAttribute, UnicodeAttribute, Attribute
@@ -15,40 +13,6 @@ from marshmallow import Schema, fields, post_dump
 from pynamodb.constants import STRING
 
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-
-
-class DecimalEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, decimal.Decimal):
-            return int(o)
-        return super(DecimalEncoder, self).default(o)
-
-
-class ConfigurationAttribute(Attribute):
-    """
-        A JSON Attribute
-
-        Encodes JSON to unicode internally
-        """
-    attr_type = STRING
-
-    def serialize(self, value):
-        """
-        Serializes JSON to unicode
-        """
-        if value is None:
-            return None
-        encoded = json.dumps(value, cls=DecimalEncoder)
-        try:
-            return unicode(encoded)
-        except NameError:
-            return encoded
-
-    def deserialize(self, value):
-        """
-        Deserializes JSON
-        """
-        return json.loads(value)
 
 
 class EventTimeAttribute(Attribute):
@@ -88,7 +52,7 @@ class AWSHistoricalMixin(object):
     accountId = UnicodeAttribute()
     userIdentity = JSONAttribute(null=True)
     principalId = UnicodeAttribute(null=True)
-    configuration = ConfigurationAttribute()
+    configuration = JSONAttribute()
     eventTime = EventTimeAttribute(range_key=True, default=datetime.utcnow())
 
 

@@ -27,7 +27,7 @@ def produce_events(events, stream):
     Efficiently batches and sends events to kinesis stream.
 
     Initially tries the max batch size of 500 records. If after encoding this
-    is over the 5mb limit it attempts to backoff the number of records until
+    is over the 5mb limit it attempts to back off the number of records until
     it falls below the 5mb limit.
     """
     client = boto3.client('kinesis')

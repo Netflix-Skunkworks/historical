@@ -13,6 +13,7 @@ from deepdiff import DeepDiff
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.s3.models import DurableS3Model
+from historical.common.dynamodb import replace_decimals
 
 deser = TypeDeserializer()
 
@@ -62,7 +63,7 @@ def handler(event, context):
             new = record['dynamodb']['NewImage']
             data = {}
             for item in new:
-                data[item] = deser.deserialize(new[item])
+                data[item] = replace_decimals(deser.deserialize(new[item]))
 
             current_revision = DurableS3Model(**data)
             if record['eventName'] == 'INSERT':
