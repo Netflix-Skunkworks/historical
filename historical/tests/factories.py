@@ -22,6 +22,42 @@ def serialize(obj):
     return obj.__dict__
 
 
+class SessionIssuer(object):
+    def __init__(self, userName, type, arn, principalId, accountId):
+        self.userName = userName
+        self.type = type
+        self.arn = arn
+        self.principalId = principalId
+        self.accountId = accountId
+
+
+class SessionIssuerFactory(Factory):
+    class Meta:
+        model = SessionIssuer
+
+    userName = FuzzyText()
+    type = 'Role'
+    arn = 'arn:aws:iam::123456789012:role/historical_poller'
+    principalId = 'AROAIKELBS2RNWG7KASDF'
+    accountId = '123456789012'
+
+
+class UserIdentity(object):
+    def __init__(self, sessionContext, principalId, type):
+        self.sessionContext = sessionContext
+        self.principalId = principalId
+        self.type = type
+
+
+class UserIdentityFactory(Factory):
+    class Meta:
+        model = UserIdentity
+
+    sessionContext = SubFactory(SessionIssuerFactory)
+    principalId = 'AROAIKELBS2RNWG7KASDF:joe@example.com'
+    type = 'Service'
+
+
 class KinesisData(object):
     def __init__(self, data):
         self.data = base64.b64encode(data.encode('utf-8'))
@@ -85,9 +121,10 @@ class DynamoDBDataFactory(Factory):
 
 
 class DynamoDBRecord(object):
-    def __init__(self, dynamodb, eventName):
+    def __init__(self, dynamodb, eventName, userIdentity):
         self.dynamodb = dynamodb
         self.eventName = eventName
+        self.userIdentity = userIdentity
 
 
 class DynamoDBRecordFactory(Factory):
@@ -97,6 +134,7 @@ class DynamoDBRecordFactory(Factory):
 
     dynamodb = SubFactory(DynamoDBDataFactory)
     eventName = 'INSERT'
+    userIdentity = SubFactory(UserIdentityFactory)
 
 
 class DynamoDBRecordsFactory(Factory):
@@ -130,40 +168,6 @@ class EventFactory(Factory):
     account = '123456789012'
     region = 'us-east-1'
     time = FuzzyDateTime(datetime.datetime.utcnow().replace(tzinfo=pytz.utc))
-
-
-class SessionIssuer(object):
-    def __init__(self, userName, type, arn, principalId, accountId):
-        self.userName = userName
-        self.type = type
-        self.arn = arn
-        self.principalId = principalId
-        self.accountId = accountId
-
-
-class SessionIssuerFactory(Factory):
-    class Meta:
-        model = SessionIssuer
-
-    userName = FuzzyText()
-    type = 'Role'
-    arn = 'arn:aws:iam::123456789012:role/historical_poller'
-    principalId = 'AROAIKELBS2RNWG7KASDF'
-    accountId = '123456789012'
-
-
-class UserIdentity(object):
-    def __init__(self, sessionContext, principalId):
-        self.sessionContext = sessionContext
-        self.principalId = principalId
-
-
-class UserIdentityFactory(Factory):
-    class Meta:
-        model = UserIdentity
-
-    sessionContext = SubFactory(SessionIssuerFactory)
-    principalId = 'AROAIKELBS2RNWG7KASDF:joe@example.com'
 
 
 class Detail(object):

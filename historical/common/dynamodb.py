@@ -51,6 +51,9 @@ def delete_record(old_image, durable_model):
         data[item] = deser.deserialize(old_image[item])
 
     data['configuration'] = {}
+
+    # we give our own timestamps for TTL deletions
+    del data['eventTime']
     durable_model(**data).save()
     log.debug('Adding deletion marker.')
 
@@ -58,11 +61,13 @@ def delete_record(old_image, durable_model):
 def process_dynamodb_record(record, durable_model, diff_func):
     """Processes a group of DynamoDB NewImage records."""
     log.info('Processing stream record...')
+
     arn = record['dynamodb']['Keys']['arn']['S']
 
     if record['eventName'] in ['INSERT', 'MODIFY']:
         new = record['dynamodb']['NewImage']
         data = {}
+
         for item in new:
             # this could end up as loss of precision
             data[item] = replace_decimals(deser.deserialize(new[item]))
@@ -76,4 +81,9 @@ def process_dynamodb_record(record, durable_model, diff_func):
             modify_record(durable_model, current_revision, arn, data['eventTime'], diff_func)
 
     if record['eventName'] == 'REMOVE':
-        delete_record(record['dynamodb']['OldImage'], durable_model)
+        # only track deletes that are from the dynamodb TTL service
+        if record.get('userIdentity'):
+            if record['userIdentity']['type'] == 'Service':
+                if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
+                    old_image = record['dynamodb']['OldImage']
+                    delete_record(old_image, durable_model)

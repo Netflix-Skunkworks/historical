@@ -9,7 +9,7 @@ from marshmallow import Schema, fields, post_dump
 
 from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute, JSONAttribute
+from pynamodb.attributes import UnicodeAttribute, NumberAttribute, ListAttribute
 
 from historical.models import HistoricalPollingEventDetail, HistoricalPollingBaseModel
 from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AWSHistoricalMixin
@@ -21,7 +21,7 @@ class SecurityGroupModel(object):
     VpcId = UnicodeAttribute(null=True)
     OwnerId = UnicodeAttribute()
     Description = UnicodeAttribute()
-    Tags = JSONAttribute()
+    Tags = ListAttribute()
 
 
 class DurableSecurityGroupModel(Model, DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):

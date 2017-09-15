@@ -8,11 +8,15 @@
 """
 from datetime import datetime
 from dateutil.tz import tzutc
-from pynamodb.attributes import JSONAttribute, UnicodeAttribute, Attribute
-from marshmallow import Schema, fields, post_dump
+from pynamodb.attributes import UnicodeAttribute, Attribute, MapAttribute
+from marshmallow import Schema, fields
 from pynamodb.constants import STRING
 
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+
+
+def default_event_time():
+    return datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
 
 
 class EventTimeAttribute(Attribute):
@@ -27,10 +31,7 @@ class EventTimeAttribute(Attribute):
         """
         if isinstance(value, str):
             return value
-        else:
-            if value.tzinfo is None:
-                value = value.replace(tzinfo=tzutc())
-            return value.astimezone(tzutc()).strftime(DATETIME_FORMAT)
+        return value.strftime(DATETIME_FORMAT)
 
     def deserialize(self, value):
         """
@@ -40,20 +41,19 @@ class EventTimeAttribute(Attribute):
 
 
 class DurableHistoricalModel(object):
-    pass    # Placeholder for future changes.
+    eventTime = EventTimeAttribute(range_key=True, default=default_event_time)
 
 
 class CurrentHistoricalModel(object):
-    pass    # Placeholder for future changes.
+    eventTime = EventTimeAttribute(default=default_event_time)
 
 
 class AWSHistoricalMixin(object):
     arn = UnicodeAttribute(hash_key=True)
     accountId = UnicodeAttribute()
-    userIdentity = JSONAttribute(null=True)
+    userIdentity = MapAttribute(null=True)
     principalId = UnicodeAttribute(null=True)
-    configuration = JSONAttribute()
-    eventTime = EventTimeAttribute(range_key=True, default=datetime.utcnow())
+    configuration = MapAttribute()
 
 
 class HistoricalPollingEventDetail(Schema):
@@ -64,28 +64,15 @@ class HistoricalPollingEventDetail(Schema):
 
     event_time = fields.Str(load_only=True, load_from="eventTime", required=True)
 
-    @post_dump()
-    def add_required_data(self, data):
-        data["eventTime"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
-
-        return data
-
 
 class HistoricalPollingBaseModel(Schema):
     version = fields.Str(required=True)
     account = fields.Str(required=True)
 
-    detail_type = fields.Str(load_only=True, load_from="detail-type", required=True)
-    source = fields.Str(load_only=True, required=True)
-    time = fields.Str(load_only=True, required=True)
+    detail_type = fields.Str(load_only=True, load_from="detail-type", required=True, missing='Historical Polling Event',
+                             default='Historical Polling Event')
+    source = fields.Str(load_only=True, required=True, missing='historical', default='historical')
+    time = fields.Str(load_only=True, required=True, default=default_event_time, missing=default_event_time)
 
     # You must replace this:
     detail = fields.Nested(HistoricalPollingEventDetail, required=True)
-
-    @post_dump()
-    def add_required_data(self, data):
-        data["detail-type"] = "Historical Polling Event"
-        data["source"] = "historical"
-        data["time"] = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
-
-        return data

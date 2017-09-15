@@ -9,6 +9,7 @@ from historical.tests.factories import (
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
     DynamoDBRecordsFactory,
+    UserIdentityFactory,
     serialize
 )
 
@@ -221,7 +222,11 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
                         'arn': SECURITY_GROUP['arn']
                     }
                 ),
-                eventName='REMOVE'
+                eventName='REMOVE',
+                userIdentity=UserIdentityFactory(
+                    type='Service',
+                    principalId='dynamodb.amazonaws.com'
+                )
             )
         ]
     )

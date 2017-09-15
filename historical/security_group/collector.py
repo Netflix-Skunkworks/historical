@@ -9,6 +9,7 @@ import os
 import logging
 
 from botocore.exceptions import ClientError
+from pynamodb.exceptions import DeleteError
 
 from raven_python_lambda import RavenLambdaWrapper
 
@@ -62,7 +63,7 @@ def group_records_by_type(records):
 
 
 def describe_group(record):
-    """Attempts to describe group ids."""
+    """Attempts to  describe group ids."""
     account_id = record['account']
     group_name = cloudwatch.filter_request_parameters('groupName', record)
     vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
@@ -101,12 +102,44 @@ def describe_group(record):
 
 
 # TODO handle deletes by name
+def create_delete_model(record):
+    """Create a security group model from a record."""
+    group_id = cloudwatch.filter_request_parameters('groupId', record)
+    vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
+    group_name = cloudwatch.filter_request_parameters('groupName', record)
+
+    arn = get_arn(group_id, record['account'])
+
+    log.debug('Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
+
+    data = {
+        'GroupId': group_id,
+        'GroupName': 'deleted',
+        'VpcId': vpc_id,
+        'Tags': [],
+        'Description': 'deleted',
+        'principalId': cloudwatch.get_principal(record),
+        'arn': arn,
+        'eventTime': record['detail']['eventTime'],
+        'OwnerId': record['account'],
+        'userIdentity': cloudwatch.get_user_identity(record),
+        'accountId': record['account'],
+        'configuration': {}
+    }
+
+    return CurrentSecurityGroupModel(**data)
+
+
 def capture_delete_records(records):
     """Writes all of our delete events to DynamoDB."""
     for r in records:
-        arn = get_arn(r['detail']['requestParameters']['groupId'], r['account'])
-        log.debug('Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
-        CurrentSecurityGroupModel(arn=arn).delete()
+        # tombstone these records so that the deletion event time can be accurately tracked.
+        model = create_delete_model(r)
+        model.save()
+        try:
+            model.delete(eventTime__le=r['detail']['eventTime'])
+        except DeleteError as e:
+            log.warning('Unable to delete security group. Security group does not exist.')
 
 
 def capture_update_records(records):
@@ -139,6 +172,9 @@ def capture_update_records(records):
             'accountId': record['account'],
             'configuration': group
         }
+
+        if record['detail'].get('eventTime'):
+            data['eventTime'] = record['detail']['eventTime']
 
         log.debug('Writing Dynamodb Record. Records: {record}'.format(record=data))
 
