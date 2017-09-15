@@ -6,12 +6,19 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 .. author:: Mike Grima <mgrima@netflix.com>
 """
+import time
+
 from datetime import datetime
-from pynamodb.attributes import UnicodeAttribute, Attribute, MapAttribute
+from pynamodb.attributes import UnicodeAttribute, Attribute, MapAttribute, NumberAttribute
 from marshmallow import Schema, fields
 from pynamodb.constants import STRING
 
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+TTL_EXPIRY = 86400  # 24 Hours in seconds
+
+
+def default_ttl():
+    return int(time.time() + TTL_EXPIRY)
 
 
 def default_event_time():
@@ -45,6 +52,7 @@ class DurableHistoricalModel(object):
 
 class CurrentHistoricalModel(object):
     eventTime = EventTimeAttribute(default=default_event_time)
+    ttl = NumberAttribute(default=default_ttl())
 
 
 class AWSHistoricalMixin(object):

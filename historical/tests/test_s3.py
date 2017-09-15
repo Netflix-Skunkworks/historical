@@ -113,6 +113,8 @@ def test_current_table(current_s3_table):
     items = list(CurrentS3Model.query('arn:aws:s3:::testbucket1'))
 
     assert len(items) == 1
+    assert isinstance(items[0].ttl, int)
+    assert items[0].ttl > 0
 
 
 def test_durable_table(durable_s3_table):
@@ -123,6 +125,7 @@ def test_durable_table(durable_s3_table):
     DurableS3Model(**S3_BUCKET).save()
     items = list(DurableS3Model.query('arn:aws:s3:::testbucket1'))
     assert len(items) == 1
+    assert not getattr(items[0], "ttl", None)
 
     S3_BUCKET['eventTime'] = datetime(2017, 5, 12, 23, 30)
     DurableS3Model(**S3_BUCKET).save()
