@@ -5,16 +5,18 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Mike Grima <mgrima@netflix.com>
 """
+import json
 import logging
 import os
 from itertools import groupby
 
 from botocore.exceptions import ClientError
-from pynamodb.exceptions import DeleteError
+from pynamodb.exceptions import DeleteError, PynamoDBConnectionError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 
 from historical.common import cloudwatch
+from historical.common.dynamodb import replace_nones
 from historical.common.kinesis import deserialize_records
 from historical.s3.models import CurrentS3Model
 
@@ -66,6 +68,26 @@ def group_records_by_type(records):
     return update_records, delete_records
 
 
+def create_delete_model(record):
+    """Create an S3 model from a record."""
+    arn = "arn:aws:s3:::{}".format(cloudwatch.filter_request_parameters('bucketName', record))
+    log.debug('Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
+
+    data = {
+        'arn': arn,
+        'principalId': cloudwatch.get_principal(record),
+        'userIdentity': cloudwatch.get_user_identity(record),
+        'accountId': record['account'],
+        'eventTime': record['detail']['eventTime'],
+        'BucketName': cloudwatch.filter_request_parameters('bucketName', record),
+        'Region': cloudwatch.get_region(record),
+        'Tags': {},
+        'configuration': {}
+    }
+
+    return CurrentS3Model(**data)
+
+
 def process_delete_records(delete_records):
     """Process the requests for S3 bucket deletions"""
     for r in delete_records:
@@ -79,10 +101,13 @@ def process_delete_records(delete_records):
         # event is newer.
         try:
             print("Deleting bucket: {}".format(arn))
-            CurrentS3Model(arn=arn).delete(eventTime__le=r["detail"]["eventTime"])
-        except DeleteError as _:
+            model = create_delete_model(r)
+            model.save(eventTime__le=r["detail"]["eventTime"])
+            model.delete()
+
+        except PynamoDBConnectionError as pdce:
             log.warn("Unable to delete bucket: {}. Either it doesn't exist, or this deletion event "
-                     "arrived after a creation/update.".format(arn))
+                     "arrived after a creation/update. The specific exception is: {}".format(arn, pdce))
 
 
 def process_update_records(update_records):
@@ -126,6 +151,9 @@ def process_update_records(update_records):
                         b
                     ))
                     continue
+
+            # Pynamo hates None types...
+            bucket_details = replace_nones(bucket_details)
 
             # Pull out the fields we want:
             data = {

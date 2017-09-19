@@ -2,11 +2,13 @@ import json
 
 import boto3
 import os
+import time
 
 from datetime import datetime
 
 from botocore.exceptions import ClientError
 
+from historical.common.dynamodb import replace_nones
 from historical.s3.models import s3_polling_schema, CurrentS3Model
 from historical.tests.factories import (
     CloudwatchEventFactory,
@@ -17,10 +19,11 @@ from historical.tests.factories import (
     serialize,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
-    DynamoDBRecordsFactory
+    DynamoDBRecordsFactory,
+    UserIdentityFactory
 )
 
-S3_BUCKET = {
+S3_BUCKET = replace_nones({
     "arn": "arn:aws:s3:::testbucket1",
     "principalId": "joe@example.com",
     "userIdentity": {
@@ -47,7 +50,16 @@ S3_BUCKET = {
         "Owner": {
             "ID": "75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a"
         },
-        "LifecycleRules": [],
+        "LifecycleRules": [
+            {
+                "Status": "Enabled",
+                "Prefix": None,
+                "Expiration": {
+                    "Days": 7
+                },
+                "ID": "Some cleanup"
+            }
+        ],
         "Logging": {},
         "Policy": None,
         "Versioning": {},
@@ -63,7 +75,7 @@ S3_BUCKET = {
         "Name": "testbucket1",
         "_version": 8
     }
-}
+})
 
 
 def test_buckets_fixture(buckets):
@@ -286,10 +298,13 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_conte
 def test_differ(durable_s3_table, mock_lambda_environment):
     from historical.s3.models import DurableS3Model
     from historical.s3.differ import handler
+    from historical.models import TTL_EXPIRY
 
+    ttl = int(time.time() + TTL_EXPIRY)
     new_bucket = S3_BUCKET.copy()
     new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
-    data = DynamoDBRecordsFactory(
+    new_bucket["ttl"] = ttl
+    new_item = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
                 dynamodb=DynamoDBDataFactory(
@@ -302,11 +317,12 @@ def test_differ(durable_s3_table, mock_lambda_environment):
             )
         ]
     )
-    data = json.loads(json.dumps(data, default=serialize))
+    data = json.loads(json.dumps(new_item, default=serialize))
     handler(data, None)
     assert DurableS3Model.count() == 1
 
     # Test duplicates don't change anything:
+    data = json.loads(json.dumps(new_item, default=serialize))
     handler(data, None)
     assert DurableS3Model.count() == 1
 
@@ -317,6 +333,7 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     ephemeral_changes["configuration"]["_version"] = 99999
     ephemeral_changes["principalId"] = "someoneelse@example.com"
     ephemeral_changes["userIdentity"]["sessionContext"]["userName"] = "someoneelse"
+    ephemeral_changes["ttl"] = ttl
 
     data = DynamoDBRecordsFactory(
         records=[
@@ -340,6 +357,7 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     new_date = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     new_changes["eventTime"] = new_date
     new_changes["Tags"] = {"ANew": "Tag"}
+    new_changes["ttl"] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -360,9 +378,10 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     assert results[1].Tags["ANew"] == "Tag"
     assert results[1].eventTime.isoformat() + 'Z' == new_date
 
-    # And deletion:
+    # And deletion (ensure new record -- testing TTL):
     delete_bucket = S3_BUCKET.copy()
     delete_bucket["eventTime"] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
+    delete_bucket["ttl"] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -372,7 +391,11 @@ def test_differ(durable_s3_table, mock_lambda_environment):
                         'arn': delete_bucket['arn']
                     }
                 ),
-                eventName='REMOVE'
+                eventName='REMOVE',
+                userIdentity=UserIdentityFactory(
+                    type='Service',
+                    principalId='dynamodb.amazonaws.com'
+                )
             )
         ]
     )

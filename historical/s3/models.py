@@ -7,7 +7,7 @@
 """
 from marshmallow import Schema, fields, post_dump
 from pynamodb.models import Model
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute, JSONAttribute
+from pynamodb.attributes import UnicodeAttribute, NumberAttribute, MapAttribute
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AWSHistoricalMixin, \
     HistoricalPollingEventDetail, HistoricalPollingBaseModel
@@ -16,7 +16,7 @@ from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AW
 class S3Model(object):
     BucketName = UnicodeAttribute()
     Region = UnicodeAttribute()
-    Tags = JSONAttribute()
+    Tags = MapAttribute()
 
 
 class DurableS3Model(Model, DurableHistoricalModel, AWSHistoricalMixin, S3Model):

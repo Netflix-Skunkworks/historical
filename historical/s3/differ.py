@@ -12,7 +12,7 @@ from deepdiff import DeepDiff
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.s3.models import DurableS3Model
-from historical.common.dynamodb import replace_decimals
+from historical.common.dynamodb import replace_decimals, remove_current_specific_fields, process_dynamodb_record
 
 deser = TypeDeserializer()
 
@@ -52,43 +52,4 @@ def handler(event, context):
     historical record.
     """
     for record in event['Records']:
-        log.info('Processing stream record...')
-        arn = record['dynamodb']['Keys']['arn']['S']
-
-        if record['eventName'] in ['INSERT', 'MODIFY']:
-            new = record['dynamodb']['NewImage']
-            data = {}
-            for item in new:
-                data[item] = replace_decimals(deser.deserialize(new[item]))
-
-            current_revision = DurableS3Model(**data)
-            if record['eventName'] == 'INSERT':
-                current_revision.save()
-                log.debug('Saving new revision to durable table.')
-
-            elif record['eventName'] == 'MODIFY':
-                # We want the newest items first.
-                # See: http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
-                items = list(DurableS3Model.query(arn, eventTime__le=data['eventTime'], scan_index_forward=False,
-                                                  limit=1))
-                if items:
-                    latest_revision = items[0]
-
-                    # Determine if there is truly a difference, disregarding Ephemeral Paths
-                    if is_new_revision(latest_revision, current_revision):
-                        current_revision.save()
-                        log.debug('Difference found saving new revision to durable table.')
-                else:
-                    log.warning('Got modify event but no current revision found. Record: {record}'.format(record=record))
-
-        if record['eventName'] == 'REMOVE':
-            old = record['dynamodb']['OldImage']
-
-            data = {}
-            for item in old:
-                data[item] = deser.deserialize(old[item])
-
-            data["configuration"] = {}
-            data["Tags"] = {}
-            DurableS3Model(**data).save()
-            log.debug('Adding deletion marker.')
+        process_dynamodb_record(record, DurableS3Model, is_new_revision)

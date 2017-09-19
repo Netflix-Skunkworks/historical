@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime
 from historical.tests.factories import (
     CloudwatchEventFactory,
@@ -110,6 +111,8 @@ def test_current_table(current_security_group_table):
     items = list(CurrentSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
     assert len(items) == 1
+    assert isinstance(items[0].ttl, int)
+    assert items[0].ttl > 0
 
 
 def test_durable_table(durable_security_group_table):
@@ -122,6 +125,7 @@ def test_durable_table(durable_security_group_table):
     items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
     assert len(items) == 1
+    assert not getattr(items[0], "ttl", None)
 
     SECURITY_GROUP['eventTime'] = datetime(2017, 5, 12, 23, 30)
     DurableSecurityGroupModel(**SECURITY_GROUP).save()
@@ -147,9 +151,12 @@ def test_poller(historical_kinesis, historical_role, mock_lambda_environment, se
 def test_differ(durable_security_group_table, mock_lambda_environment):
     from historical.security_group.models import DurableSecurityGroupModel
     from historical.security_group.differ import handler
+    from historical.models import TTL_EXPIRY
 
+    ttl = int(time.time() + TTL_EXPIRY)
     new_group = SECURITY_GROUP.copy()
     new_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+    new_group["ttl"] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -170,7 +177,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
 
     duplicate_group = SECURITY_GROUP.copy()
     duplicate_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
-
+    duplicate_group["ttl"] = ttl
     # ensure no new record for the same data
     data = DynamoDBRecordsFactory(
         records=[
@@ -192,6 +199,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     updated_group = SECURITY_GROUP.copy()
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_group['Description'] = 'changeme'
+    updated_group["ttl"] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -211,6 +219,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
 
     deleted_group = SECURITY_GROUP.copy()
     deleted_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
+    deleted_group["ttl"] = ttl
 
     # ensure new record
     data = DynamoDBRecordsFactory(

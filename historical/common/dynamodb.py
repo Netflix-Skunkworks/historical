@@ -9,6 +9,13 @@ deser = TypeDeserializer()
 log = logging.getLogger('historical')
 
 
+def remove_current_specific_fields(obj):
+    """Remove all fields that belong to the Current table -- that don't belong in the Durable table"""
+    # TTL:
+    del obj["ttl"]
+    return obj
+
+
 def replace_decimals(obj):
     """Recursively replace Decimal objects with floats or ints."""
     if isinstance(obj, list):
@@ -24,6 +31,22 @@ def replace_decimals(obj):
             return int(obj)
         else:
             return float(obj)
+    else:
+        return obj
+
+
+def replace_nones(obj):
+    """Recursively replace Empty strings with empty objects because Pynamo thinks empty strings are actually None"""
+    if isinstance(obj, list):
+        for i in range(len(obj)):
+            obj[i] = replace_nones(obj[i])
+        return obj
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            obj[k] = replace_nones(v)
+        return obj
+    elif obj is None:
+        return {}   # Pynamo doesn't like empty strings...
     else:
         return obj
 
@@ -65,7 +88,7 @@ def process_dynamodb_record(record, durable_model, diff_func):
     arn = record['dynamodb']['Keys']['arn']['S']
 
     if record['eventName'] in ['INSERT', 'MODIFY']:
-        new = record['dynamodb']['NewImage']
+        new = remove_current_specific_fields(record['dynamodb']['NewImage'])
         data = {}
 
         for item in new:
@@ -85,5 +108,5 @@ def process_dynamodb_record(record, durable_model, diff_func):
         if record.get('userIdentity'):
             if record['userIdentity']['type'] == 'Service':
                 if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
-                    old_image = record['dynamodb']['OldImage']
+                    old_image = remove_current_specific_fields(record['dynamodb']['OldImage'])
                     delete_record(old_image, durable_model)
