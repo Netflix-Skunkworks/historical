@@ -144,11 +144,10 @@ def test_durable_table(durable_s3_table):
     assert len(items) == 2
 
 
-def test_poller(historical_role, buckets, mock_lambda_context, mock_lambda_environment, historical_kinesis,
-                swag_accounts):
+def test_poller(historical_role, buckets, mock_lambda_environment, historical_kinesis, swag_accounts):
     from historical.s3.poller import handler
     os.environ["MAX_BUCKET_BATCH"] = "4"
-    handler({}, mock_lambda_context)
+    handler({}, None)
 
     # Need to ensure that 50 Buckets were added to the stream:
     kinesis = boto3.client("kinesis", region_name="us-east-1")
@@ -181,13 +180,12 @@ def test_poller(historical_role, buckets, mock_lambda_context, mock_lambda_envir
 
     old_method = historical.s3.poller.create_polling_event  # For pytest inter-test issues...
     historical.s3.poller.create_polling_event = mocked_poller
-    handler({}, mock_lambda_context)
+    handler({}, None)
     historical.s3.poller.create_polling_event = old_method
     # ^^ No exception = pass
 
 
-def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_environment, swag_accounts,
-                   current_s3_table):
+def test_collector(historical_role, buckets, mock_lambda_environment, swag_accounts, current_s3_table):
     from historical.s3.collector import handler
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
     create_event = CloudwatchEventFactory(
@@ -210,7 +208,7 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, mock_lambda_context)
+    handler(data, None)
     assert CurrentS3Model.count() == 1
 
     # Polling (make sure the date is included):
@@ -235,7 +233,7 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, mock_lambda_context)
+    handler(data, None)
     assert CurrentS3Model.count() == 1
 
     # Load the config and verify the polling timestamp is in there:
@@ -262,12 +260,12 @@ def test_collector(historical_role, buckets, mock_lambda_context, mock_lambda_en
     )
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
-    handler(data, mock_lambda_context)
+    handler(data, None)
     assert CurrentS3Model.count() == 0
 
 
-def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_context, mock_lambda_environment,
-                                     swag_accounts, current_s3_table):
+def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_environment, swag_accounts,
+                                     current_s3_table):
     from historical.s3.collector import handler
     # If an event arrives on a bucket that is deleted, then it should skip
     # and wait until the Deletion event arrives.
@@ -290,7 +288,7 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_conte
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, mock_lambda_context)
+    handler(data, None)
     assert CurrentS3Model.count() == 0
 
 
