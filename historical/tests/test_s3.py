@@ -8,7 +8,6 @@ from datetime import datetime
 
 from botocore.exceptions import ClientError
 
-from historical.common.dynamodb import replace_nones
 from historical.s3.models import s3_polling_schema, CurrentS3Model
 from historical.tests.factories import (
     CloudwatchEventFactory,
@@ -23,7 +22,7 @@ from historical.tests.factories import (
     UserIdentityFactory
 )
 
-S3_BUCKET = replace_nones({
+S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
     "principalId": "joe@example.com",
     "userIdentity": {
@@ -75,7 +74,7 @@ S3_BUCKET = replace_nones({
         "Name": "testbucket1",
         "_version": 8
     }
-})
+}
 
 
 def test_buckets_fixture(buckets):
@@ -376,7 +375,7 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     results = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(results) == 2
     assert results[1].Tags["ANew"] == "Tag"
-    assert results[1].eventTime.isoformat() + 'Z' == new_date
+    assert results[1].eventTime == new_date
 
     # And deletion (ensure new record -- testing TTL):
     delete_bucket = S3_BUCKET.copy()

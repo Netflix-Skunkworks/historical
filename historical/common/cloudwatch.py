@@ -51,3 +51,19 @@ def get_account_id(event):
     """Gets the account id from an event"""
     return event['account']
 
+
+def get_historical_base_info(event):
+    data = {
+        'principalId': get_principal(event),
+        'userIdentity': get_user_identity(event),
+        'accountId': event['account'],
+        'userAgent': event.get('userAgent'),
+        'sourceIpAddress': event.get('sourceIpAddress'),
+        'requestParameters': event.get('requestParameters')
+    }
+
+    if event['detail'].get('eventTime'):
+        data['eventTime'] = event['detail']['eventTime']
+
+    return data
+

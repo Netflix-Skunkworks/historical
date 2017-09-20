@@ -21,7 +21,8 @@ from historical.security_group.models import CurrentSecurityGroupModel
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-log.setLevel(logging.WARNING)
+level = logging.getLevelName(os.environ.get('HISTORICAL_LOGGING_LEVEL', 'WARNING'))
+log.setLevel(level)
 
 
 UPDATE_EVENTS = [
@@ -104,6 +105,8 @@ def describe_group(record):
 # TODO handle deletes by name
 def create_delete_model(record):
     """Create a security group model from a record."""
+    data = cloudwatch.get_historical_base_info(record)
+
     group_id = cloudwatch.filter_request_parameters('groupId', record)
     vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
     group_name = cloudwatch.filter_request_parameters('groupName', record)
@@ -112,40 +115,41 @@ def create_delete_model(record):
 
     log.debug('Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
 
-    data = {
-        'GroupId': group_id,
-        'GroupName': 'deleted',
-        'VpcId': vpc_id,
-        'Tags': [],
-        'Description': 'deleted',
-        'principalId': cloudwatch.get_principal(record),
-        'arn': arn,
-        'eventTime': record['detail']['eventTime'],
-        'OwnerId': record['account'],
-        'userIdentity': cloudwatch.get_user_identity(record),
-        'accountId': record['account'],
+    # tombstone these records so that the deletion event time can be accurately tracked.
+    data.update({
         'configuration': {}
-    }
+    })
 
-    return CurrentSecurityGroupModel(**data)
+    items = list(CurrentSecurityGroupModel.query(arn, limit=1))
+
+    if items:
+        model_dict = items[0].__dict__['attribute_values'].copy()
+        model_dict.update(data)
+        return CurrentSecurityGroupModel(**model_dict)
 
 
 def capture_delete_records(records):
     """Writes all of our delete events to DynamoDB."""
     for r in records:
-        # tombstone these records so that the deletion event time can be accurately tracked.
         model = create_delete_model(r)
         model.save()
-        try:
-            model.delete(eventTime__le=r['detail']['eventTime'])
-        except DeleteError as e:
-            log.warning('Unable to delete security group. Security group does not exist.')
+        if model:
+            try:
+                model.delete(eventTime__le=r['detail']['eventTime'])
+            except DeleteError as e:
+                log.warning('Unable to delete security group. Security group does not exist. Record: {record}'.format(
+                    record=r
+                ))
+        else:
+            log.warning('Unable to delete security group. Security group does not exist. Record: {record}'.format(
+                record=r
+            ))
 
 
 def capture_update_records(records):
     """Writes all updated configuration info to DynamoDB"""
     for record in records:
-
+        data = cloudwatch.get_historical_base_info(record)
         group = describe_group(record)
 
         if len(group) > 1:
@@ -159,22 +163,16 @@ def capture_update_records(records):
 
         # determine event data for group
         log.debug('Processing group. Group: {}'.format(group))
-        data = {
+        data.update({
             'GroupId': group['GroupId'],
             'GroupName': group['GroupName'],
             'Description': group['Description'],
             'VpcId': group.get('VpcId'),
             'Tags': group.get('Tags', []),
-            'principalId': cloudwatch.get_principal(record),
             'arn': get_arn(group['GroupId'], group['OwnerId']),
             'OwnerId': group['OwnerId'],
-            'userIdentity': cloudwatch.get_user_identity(record),
-            'accountId': record['account'],
             'configuration': group
-        }
-
-        if record['detail'].get('eventTime'):
-            data['eventTime'] = record['detail']['eventTime']
+        })
 
         log.debug('Writing Dynamodb Record. Records: {record}'.format(record=data))
 

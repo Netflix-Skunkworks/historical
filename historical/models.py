@@ -7,14 +7,23 @@
 .. author:: Mike Grima <mgrima@netflix.com>
 """
 import time
-
 from datetime import datetime
-from pynamodb.attributes import UnicodeAttribute, Attribute, MapAttribute, NumberAttribute
-from marshmallow import Schema, fields
-from pynamodb.constants import STRING
 
-DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+from historical.attributes import EventTimeAttribute
+from marshmallow import Schema, fields
+from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
+
 TTL_EXPIRY = 86400  # 24 Hours in seconds
+
+
+EPHEMERAL_PATHS = [
+    "root[1]['range_key']",
+    "root[1]['attributes']['principalId']",
+    "root[1]['attributes']['userIdentity']",
+    "root[1]['attributes']['requestParams']",
+    "root[1]['attributes']['sourceIpAddress']",
+    "root[1]['attributes']['userAgent']"
+]
 
 
 def default_ttl():
@@ -23,27 +32,6 @@ def default_ttl():
 
 def default_event_time():
     return datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
-
-
-class EventTimeAttribute(Attribute):
-    """
-    An attribute for storing a UTC Datetime or iso8601 string
-    """
-    attr_type = STRING
-
-    def serialize(self, value):
-        """
-        Takes a datetime object and returns a string
-        """
-        if isinstance(value, str):
-            return value
-        return value.strftime(DATETIME_FORMAT)
-
-    def deserialize(self, value):
-        """
-        Takes a iso8601 datetime string and returns a datetime object
-        """
-        return datetime.strptime(value, DATETIME_FORMAT)
 
 
 class DurableHistoricalModel(object):
@@ -60,7 +48,10 @@ class AWSHistoricalMixin(object):
     accountId = UnicodeAttribute()
     userIdentity = MapAttribute(null=True)
     principalId = UnicodeAttribute(null=True)
-    configuration = MapAttribute()
+    configuration = MapAttribute(null=True)
+    userAgent = UnicodeAttribute(null=True)
+    sourceIpAddress = UnicodeAttribute(null=True)
+    requestParameters = MapAttribute(null=True)
 
 
 class HistoricalPollingEventDetail(Schema):

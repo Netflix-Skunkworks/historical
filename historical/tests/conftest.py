@@ -11,37 +11,37 @@ from moto.sts import mock_sts
 from moto.ec2 import mock_ec2
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def s3():
     with mock_s3():
-        yield boto3.client("s3")
+        yield boto3.client('s3')
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def ec2():
     with mock_ec2():
-        yield boto3.client("ec2")
+        yield boto3.client('ec2')
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def sts():
     with mock_sts():
-        yield boto3.client("sts")
+        yield boto3.client('sts')
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def iam():
     with mock_iam():
-        yield boto3.client("iam")
+        yield boto3.client('iam')
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def dynamodb():
     with mock_dynamodb2():
-        yield boto3.client("dynamodb", region_name="us-east-1")
+        yield boto3.client('dynamodb', region_name='us-east-1')
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def swag_accounts(s3):
     from swag_client.backend import SWAGManager
     from swag_client.util import parse_swag_config_options
@@ -81,30 +81,29 @@ def swag_accounts(s3):
     swag.create(account)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def historical_role(iam, sts):
-    iam.create_role(RoleName="historicalrole", AssumeRolePolicyDocument="{}")
-    os.environ["HISTORICAL_ROLE"] = "historicalrole"
+    iam.create_role(RoleName='historicalrole', AssumeRolePolicyDocument='{}')
+    os.environ['HISTORICAL_ROLE'] = 'historicalrole'
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def historical_kinesis():
     with mock_kinesis():
-        client = boto3.client("kinesis", region_name="us-east-1")
-        client.create_stream(StreamName="historicalstream", ShardCount=1)
-        os.environ["HISTORICAL_STREAM"] = "historicalstream"
-
+        client = boto3.client('kinesis', region_name='us-east-1')
+        client.create_stream(StreamName='historicalstream', ShardCount=1)
+        os.environ['HISTORICAL_STREAM'] = 'historicalstream'
         yield client
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def buckets(s3):
     # Create buckets:
     for i in range(0, 50):
-        s3.create_bucket(Bucket="testbucket{}".format(i))
+        s3.create_bucket(Bucket='testbucket{}'.format(i))
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def security_groups(ec2):
     """Creates security groups."""
     yield ec2.create_security_group(
@@ -114,25 +113,13 @@ def security_groups(ec2):
     )
 
 
-@pytest.fixture(scope="function")
-def mock_lambda_context():
-    class MockLambdaContext():
-        @staticmethod
-        def get_remaining_time_in_millis():
-            return 5000
-
-    # Mock out the Raven Python Lambda timer method:
-    import raven_python_lambda
-    raven_python_lambda.install_timers = lambda x, y: None
-
-
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def mock_lambda_environment():
     os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
     os.environ['SENTRY_ENABLED'] = 'f'
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def current_security_group_table():
     from historical.security_group.models import CurrentSecurityGroupModel
     mock_dynamodb2().start()
@@ -140,7 +127,7 @@ def current_security_group_table():
     mock_dynamodb2().stop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def durable_security_group_table():
     from historical.security_group.models import DurableSecurityGroupModel
     mock_dynamodb2().start()
@@ -148,13 +135,13 @@ def durable_security_group_table():
     mock_dynamodb2().stop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def current_s3_table(dynamodb):
     from historical.s3.models import CurrentS3Model
     yield CurrentS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope='function')
 def durable_s3_table(dynamodb):
     from historical.s3.models import DurableS3Model
     yield DurableS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)

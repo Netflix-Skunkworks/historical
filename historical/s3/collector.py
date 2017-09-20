@@ -16,7 +16,6 @@ from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 
 from historical.common import cloudwatch
-from historical.common.dynamodb import replace_nones
 from historical.common.kinesis import deserialize_records
 from historical.s3.models import CurrentS3Model
 
@@ -147,13 +146,11 @@ def process_update_records(update_records):
 
             except ClientError as ce:
                 if ce.response["Error"]["Code"] == "NoSuchBucket":
-                    log.warn("Received update request for bucket: {} that does not currently exist. Skipping.".format(
+                    log.warning("Received update request for bucket: {} that does not currently exist. Skipping.".format(
                         b
                     ))
                     continue
-
-            # Pynamo hates None types...
-            bucket_details = replace_nones(bucket_details)
+                raise Exception(ce)
 
             # Pull out the fields we want:
             data = {

@@ -12,7 +12,7 @@ from deepdiff import DeepDiff
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.s3.models import DurableS3Model
-from historical.common.dynamodb import replace_decimals, remove_current_specific_fields, process_dynamodb_record
+from historical.common.dynamodb import remove_current_specific_fields, process_dynamodb_record
 
 deser = TypeDeserializer()
 

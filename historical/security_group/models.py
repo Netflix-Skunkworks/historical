@@ -11,8 +11,13 @@ from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, ListAttribute
 
-from historical.models import HistoricalPollingEventDetail, HistoricalPollingBaseModel
-from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AWSHistoricalMixin
+from historical.models import (
+    HistoricalPollingEventDetail,
+    HistoricalPollingBaseModel,
+    DurableHistoricalModel,
+    CurrentHistoricalModel,
+    AWSHistoricalMixin,
+)
 
 
 class SecurityGroupModel(object):

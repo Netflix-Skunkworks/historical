@@ -22,7 +22,7 @@ SECURITY_GROUP = {
     'accountId': '123456789012',
     'OwnerId': '123456789012',
     'Description': 'This is a test',
-    'Tags': [{'owner': 'test@example.com'}],
+    'Tags': [{'Name': 'test', 'Value': '<empty>'}],
     'configuration': {
         'Description': 'string',
         'GroupName': 'string',
@@ -217,6 +217,27 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 2
 
+    updated_group = SECURITY_GROUP.copy()
+    updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
+    updated_group['configuration']['IpPermissions'][0]['IpRanges'][0]['CidrIp'] = 'changeme'
+    updated_group["ttl"] = ttl
+    data = DynamoDBRecordsFactory(
+        records=[
+            DynamoDBRecordFactory(
+                dynamodb=DynamoDBDataFactory(
+                    NewImage=updated_group,
+                    Keys={
+                        'arn': SECURITY_GROUP['arn']
+                    }
+                ),
+                eventName='MODIFY'
+            )
+        ]
+    )
+    data = json.loads(json.dumps(data, default=serialize))
+    handler(data, None)
+    assert DurableSecurityGroupModel.count() == 3
+
     deleted_group = SECURITY_GROUP.copy()
     deleted_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
     deleted_group["ttl"] = ttl
@@ -241,7 +262,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     )
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
-    assert DurableSecurityGroupModel.count() == 3
+    assert DurableSecurityGroupModel.count() == 4
 
 
 def test_collector(historical_role, mock_lambda_environment, security_groups, current_security_group_table):

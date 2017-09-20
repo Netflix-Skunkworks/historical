@@ -10,6 +10,7 @@ from deepdiff import DeepDiff
 
 from raven_python_lambda import RavenLambdaWrapper
 
+from historical.models import EPHEMERAL_PATHS
 from historical.common.dynamodb import process_dynamodb_record
 from historical.security_group.models import DurableSecurityGroupModel
 
@@ -17,18 +18,12 @@ logging.basicConfig()
 log = logging.getLogger('historical')
 log.setLevel(logging.WARNING)
 
-EPHEMERAL_PATHS = [
-    "root['attribute_values']['eventTime']",
-    "root['attribute_values']['principalId']",
-    "root['attribute_values']['userIdentity']",
-]
-
 
 def is_new_revision(latest_revision, current_revision):
     """Determine if two revisions have actually changed."""
     diff = DeepDiff(
-        current_revision.__dict__,
-        latest_revision.__dict__,
+        current_revision._get_json(),
+        latest_revision._get_json(),
         exclude_paths=EPHEMERAL_PATHS,
         ignore_order=True
     )
