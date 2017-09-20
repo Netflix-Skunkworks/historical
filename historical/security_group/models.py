@@ -17,6 +17,7 @@ from historical.models import (
     DurableHistoricalModel,
     CurrentHistoricalModel,
     AWSHistoricalMixin,
+    DYNAMO_REGION
 )
 
 
@@ -32,16 +33,19 @@ class SecurityGroupModel(object):
 class DurableSecurityGroupModel(Model, DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupDurableTable'
+        region = DYNAMO_REGION
 
 
 class CurrentSecurityGroupModel(Model, CurrentHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupCurrentTable'
+        region = DYNAMO_REGION
 
 
 class ViewIndex(GlobalSecondaryIndex):
     class Meta:
         projection = AllProjection()
+        region = DYNAMO_REGION
 
     view = NumberAttribute(default=0, hash_key=True)
 

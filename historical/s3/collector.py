@@ -5,13 +5,12 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Mike Grima <mgrima@netflix.com>
 """
-import json
 import logging
 import os
 from itertools import groupby
 
 from botocore.exceptions import ClientError
-from pynamodb.exceptions import DeleteError, PynamoDBConnectionError
+from pynamodb.exceptions import PynamoDBConnectionError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 

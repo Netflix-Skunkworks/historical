@@ -6,6 +6,7 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 .. author:: Mike Grima <mgrima@netflix.com>
 """
+import os
 import time
 from datetime import datetime
 
@@ -14,6 +15,8 @@ from marshmallow import Schema, fields
 from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
 
 TTL_EXPIRY = 86400  # 24 Hours in seconds
+
+DYNAMO_REGION = os.environ.get("HISTORICAL_REGION", "us-east-1")
 
 
 EPHEMERAL_PATHS = [
