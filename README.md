@@ -22,8 +22,8 @@ Key Features:
 | ------------ | ------------------ |
 | iam.roles    | In-progress        |
 | ec2.security_groups | In-progress |
-| s3           | In-progress        |
-
+| s3           | Complete ✅       |
+| route53      | In-progress        |
 
 ## Documentation
 https://historical.readthedocs.com
