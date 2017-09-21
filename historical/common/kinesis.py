@@ -47,7 +47,7 @@ def produce_events(events, stream):
         else:
             break
 
-    for chunk in chunks(events, 500):
+    for chunk in chunks(events, chunk_size):
         client.put_records(
             Records=chunk,
             StreamName=stream

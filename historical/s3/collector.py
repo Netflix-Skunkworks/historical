@@ -137,7 +137,8 @@ def process_update_records(update_records):
                 bucket_details = get_bucket(b,
                                             account_number=account_id,
                                             include_created=(item.get("creationDate") is None),
-                                            assume_role=os.environ["HISTORICAL_ROLE"])
+                                            assume_role=os.environ["HISTORICAL_ROLE"],
+                                            region=os.environ["HISTORICAL_REGION"])
                 if bucket_details.get("Error"):
                     log.error("Unable to fetch details about bucket: {}. "
                               "The error details are: {}".format(b, bucket_details["Error"]))
