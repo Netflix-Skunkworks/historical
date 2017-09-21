@@ -125,14 +125,15 @@ def create_delete_model(record):
     if items:
         model_dict = items[0].__dict__['attribute_values'].copy()
         model_dict.update(data)
-        return CurrentSecurityGroupModel(**model_dict)
+        model = CurrentSecurityGroupModel(**model_dict)
+        model.save()
+        return model
 
 
 def capture_delete_records(records):
     """Writes all of our delete events to DynamoDB."""
     for r in records:
         model = create_delete_model(r)
-        model.save()
         if model:
             try:
                 model.delete(eventTime__le=r['detail']['eventTime'])
