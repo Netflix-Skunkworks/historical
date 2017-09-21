@@ -147,6 +147,7 @@ def test_durable_table(durable_s3_table):
 def test_poller(historical_role, buckets, mock_lambda_environment, historical_kinesis, swag_accounts):
     from historical.s3.poller import handler
     os.environ["MAX_BUCKET_BATCH"] = "4"
+    os.environ["HISTORICAL_REGION"] = "us-east-1"
     handler({}, None)
 
     # Need to ensure that 50 Buckets were added to the stream:
@@ -187,6 +188,8 @@ def test_poller(historical_role, buckets, mock_lambda_environment, historical_ki
 
 def test_collector(historical_role, buckets, mock_lambda_environment, swag_accounts, current_s3_table):
     from historical.s3.collector import handler
+    os.environ["HISTORICAL_REGION"] = "us-east-1"
+
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
     create_event = CloudwatchEventFactory(
         detail=DetailFactory(
@@ -267,6 +270,8 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
 def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_environment, swag_accounts,
                                      current_s3_table):
     from historical.s3.collector import handler
+    os.environ["HISTORICAL_REGION"] = "us-east-1"
+
     # If an event arrives on a bucket that is deleted, then it should skip
     # and wait until the Deletion event arrives.
     create_event = CloudwatchEventFactory(

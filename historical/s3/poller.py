@@ -38,8 +38,9 @@ def create_polling_event(account):
     # This should probably fan out on an account-by-account basis (we'll need to examine if this is an issue)
     all_buckets = list_buckets(account_number=account,
                                assume_role=os.environ["HISTORICAL_ROLE"],
-                               session_name="historical-cloudwatch-s3list")["Buckets"]
-    client = boto3.client("kinesis", region_name=os.environ.get("HISTORICAL_REGION", "us-east-1"))
+                               session_name="historical-cloudwatch-s3list",
+                               region=os.environ["HISTORICAL_REGION"])["Buckets"]
+    client = boto3.client("kinesis", region_name=os.environ["HISTORICAL_REGION"])
 
     # Need to add all buckets into the stream:
     limiter = int(os.environ.get("MAX_BUCKET_BATCH", 50))
