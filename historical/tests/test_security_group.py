@@ -198,7 +198,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
 
     updated_group = SECURITY_GROUP.copy()
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
-    updated_group['Description'] = 'changeme'
+    updated_group['configuration']['Description'] = 'changeme'
     updated_group["ttl"] = ttl
     data = DynamoDBRecordsFactory(
         records=[

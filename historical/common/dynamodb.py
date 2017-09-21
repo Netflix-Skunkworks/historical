@@ -21,7 +21,6 @@ def modify_record(durable_model, current_revision, arn, event_time, diff_func):
     """Handles a DynamoDB MODIFY event type."""
     # We want the newest items first.
     # See: http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
-
     items = list(durable_model.query(arn, eventTime__le=event_time, scan_index_forward=False, limit=1))
     if items:
         latest_revision = items[0]

@@ -44,7 +44,7 @@ def handler(event, context):
             'swag.region': os.environ.get('SWAG_REGION', 'us-east-1')
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = swag.get_all("[?provider=='aws']")
+        accounts = swag.get_all("[?provider=='aws'] && [?owner=='{}']".format(os.environ['SWAG_OWNER']))
     else:
         accounts = os.environ['ENABLED_ACCOUNTS']
 

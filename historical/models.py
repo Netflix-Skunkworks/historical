@@ -20,12 +20,6 @@ DYNAMO_REGION = os.environ.get("HISTORICAL_REGION", "us-east-1")
 
 
 EPHEMERAL_PATHS = [
-    "root[1]['range_key']",
-    "root[1]['attributes']['principalId']",
-    "root[1]['attributes']['userIdentity']",
-    "root[1]['attributes']['requestParams']",
-    "root[1]['attributes']['sourceIpAddress']",
-    "root[1]['attributes']['userAgent']"
 ]
 
 
