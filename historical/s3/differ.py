@@ -12,7 +12,7 @@ from deepdiff import DeepDiff
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.s3.models import DurableS3Model
-from historical.common.dynamodb import remove_current_specific_fields, process_dynamodb_record
+from historical.common.dynamodb import process_dynamodb_record
 
 deser = TypeDeserializer()
 
@@ -20,23 +20,18 @@ logging.basicConfig()
 log = logging.getLogger('historical')
 log.setLevel(logging.WARNING)
 
-# Path to where in the dict the ephemeral field is -- starting with "root['attribute_values'][rest...of...path]..."
+# Path to where in the dict the ephemeral field is -- starting with "root['M'][PathInConfigDontForgetDataType]..."
 EPHEMERAL_PATHS = [
-    # Typical paths we generally don't care about:
-    "root['attribute_values']['eventTime']",
-    "root['attribute_values']['principalId']",
-    "root['attribute_values']['userIdentity']",
-    
     # Configuration level changes are don't care about:
-    "root['attribute_values']['configuration']['_version']"
+    "root['M']['_version']"
 ]
 
 
 def is_new_revision(latest_revision, current_revision):
     """Determine if two revisions have actually changed."""
     diff = DeepDiff(
-        current_revision.__dict__,
-        latest_revision.__dict__,
+        current_revision,
+        latest_revision,
         exclude_paths=EPHEMERAL_PATHS,
         ignore_order=True
     )
@@ -52,4 +47,4 @@ def handler(event, context):
     historical record.
     """
     for record in event['Records']:
-        process_dynamodb_record(record, DurableS3Model, is_new_revision)
+        process_dynamodb_record(record, DurableS3Model, diff_func=is_new_revision)

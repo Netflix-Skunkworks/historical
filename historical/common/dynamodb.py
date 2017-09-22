@@ -72,8 +72,10 @@ def delete_record(old_image, durable_model):
     log.debug('Adding deletion marker.')
 
 
-def process_dynamodb_record(record, durable_model, diff_func=default_diff):
+def process_dynamodb_record(record, durable_model, diff_func=None):
     """Processes a group of DynamoDB NewImage records."""
+    diff_func = diff_func or default_diff
+
     arn = record['dynamodb']['Keys']['arn']['S']
 
     if record['eventName'] in ['INSERT', 'MODIFY']:

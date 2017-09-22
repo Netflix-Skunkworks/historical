@@ -212,7 +212,12 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     data = json.loads(data)
 
     handler(data, None)
-    assert CurrentS3Model.count() == 1
+    result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
+    assert len(result) == 1
+    # Verify that the tags are duplicated in the top level and configuration:
+    assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
+    assert result[0].Tags.attribute_values["theBucketName"] == \
+           result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
 
     # Polling (make sure the date is included):
     polling_event = CloudwatchEventFactory(
@@ -359,6 +364,7 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     new_date = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     new_changes["eventTime"] = new_date
     new_changes["Tags"] = {"ANew": "Tag"}
+    new_changes["configuration"]["Tags"] = {"ANew": "Tag"}
     new_changes["ttl"] = ttl
     data = DynamoDBRecordsFactory(
         records=[
@@ -377,7 +383,7 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     handler(data, None)
     results = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(results) == 2
-    assert results[1].Tags["ANew"] == "Tag"
+    assert results[1].Tags["ANew"] == results[1].configuration.attribute_values["Tags"]["ANew"] == "Tag"
     assert results[1].eventTime == new_date
 
     # And deletion (ensure new record -- testing TTL):
