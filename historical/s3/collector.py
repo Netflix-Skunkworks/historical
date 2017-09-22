@@ -146,9 +146,8 @@ def process_update_records(update_records):
 
             except ClientError as ce:
                 if ce.response["Error"]["Code"] == "NoSuchBucket":
-                    log.warning("Received update request for bucket: {} that does not currently exist. Skipping.".format(
-                        b
-                    ))
+                    log.warning("Received update request for bucket: {} that does not "
+                                "currently exist. Skipping.".format(b))
                     continue
                 raise Exception(ce)
 
@@ -161,6 +160,7 @@ def process_update_records(update_records):
                 "eventTime": item["eventDetails"]["detail"]["eventTime"],
                 "BucketName": b,
                 "Region": bucket_details["Region"],
+                # Duplicated in top level and configuration for secondary index
                 "Tags": bucket_details["Tags"] or {}
             }
 
@@ -168,7 +168,6 @@ def process_update_records(update_records):
             del bucket_details["Arn"]
             del bucket_details["GrantReferences"]
             del bucket_details["Region"]
-            del bucket_details["Tags"]
             del bucket_details["Owner"]
 
             if not bucket_details.get("CreationDate"):

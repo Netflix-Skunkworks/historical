@@ -39,7 +39,7 @@ install_requires = [
 
 tests_require = [
     'pytest==3.1.3',
-    'moto==1.1.2',
+    # 'moto==1.1.2',
     'coveralls==1.1',
     'factory-boy==2.9.2'
 ]

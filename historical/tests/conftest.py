@@ -103,6 +103,17 @@ def buckets(s3):
     # Create buckets:
     for i in range(0, 50):
         s3.create_bucket(Bucket='testbucket{}'.format(i))
+        s3.put_bucket_tagging(
+            Bucket='testbucket{}'.format(i),
+            Tagging={
+                "TagSet": [
+                    {
+                        "Key": "theBucketName",
+                        "Value": "testbucket{}".format(i)
+                    }
+                ]
+            }
+        )
 
 
 @pytest.fixture(scope='function')

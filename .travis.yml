@@ -16,6 +16,8 @@ before_script:
   - pip install --upgrade pip
   - pip install --upgrade setuptools
   - pip install -e .
+  # Temporary until Moto fixes merged and pushed:
+  - pip install git+https://github.com/mikegrima/moto.git@s3bug
   - pip install .[tests]
 
 script:
