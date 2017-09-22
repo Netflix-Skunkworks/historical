@@ -61,7 +61,9 @@ class EventTimeAttribute(Attribute):
 
 def decimal_default(obj):
     if isinstance(obj, decimal.Decimal):
-        return float(obj)
+        if obj % 1:
+            return float(obj)
+        return int(obj)
     raise TypeError
 
 

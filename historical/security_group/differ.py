@@ -6,7 +6,6 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
 import logging
-from deepdiff import DeepDiff
 
 from raven_python_lambda import RavenLambdaWrapper
 
@@ -18,18 +17,6 @@ log = logging.getLogger('historical')
 log.setLevel(logging.WARNING)
 
 
-def is_new_revision(latest_revision, current_revision):
-    """Determine if two revisions have actually changed."""
-    latest_config = latest_revision._get_json()[1]['attributes']['configuration']
-    current_config = current_revision._get_json()[1]['attributes']['configuration']
-    diff = DeepDiff(
-        latest_config,
-        current_config,
-        ignore_order=True
-    )
-    return diff
-
-
 @RavenLambdaWrapper()
 def handler(event, context):
     """
@@ -39,4 +26,4 @@ def handler(event, context):
     historical record.
     """
     for record in event['Records']:
-        process_dynamodb_record(record, DurableSecurityGroupModel, is_new_revision)
+        process_dynamodb_record(record, DurableSecurityGroupModel)

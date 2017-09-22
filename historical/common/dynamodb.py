@@ -1,12 +1,23 @@
-import decimal
+import json
 import logging
 
+from deepdiff import DeepDiff
 from boto3.dynamodb.types import TypeDeserializer
 
 deser = TypeDeserializer()
 
 
 log = logging.getLogger('historical')
+
+
+def default_diff(latest_config, current_config):
+    """Determine if two revisions have actually changed."""
+    diff = DeepDiff(
+        latest_config,
+        current_config,
+        ignore_order=True
+    )
+    return diff
 
 
 def remove_current_specific_fields(obj):
@@ -21,17 +32,30 @@ def modify_record(durable_model, current_revision, arn, event_time, diff_func):
     """Handles a DynamoDB MODIFY event type."""
     # We want the newest items first.
     # See: http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html
-    items = list(durable_model.query(arn, eventTime__le=event_time, scan_index_forward=False, limit=1))
+    items = list(durable_model.query(
+        arn,
+        eventTime__le=event_time,
+        scan_index_forward=False,
+        limit=1,
+        consistent_read=True))
+
     if items:
         latest_revision = items[0]
 
+        latest_config = latest_revision._get_json()[1]['attributes']['configuration']
+        current_config = current_revision._get_json()[1]['attributes']['configuration']
+
         # Determine if there is truly a difference, disregarding Ephemeral Paths
-        if diff_func(latest_revision, current_revision):
+        diff = diff_func(latest_config, current_config)
+        if diff:
+            log.debug(
+                'Difference found saving new revision to durable table. Arn: {} LatestConfig: {} CurrentConfig: {}'.format(
+                    arn, json.dumps(latest_config), json.dumps(current_config)
+                ))
             current_revision.save()
-            log.debug('Difference found saving new revision to durable table.')
     else:
         current_revision.save()
-        log.warning('Got modify event but no current revision found. Arn: {arn}'.format(arn=arn))
+        log.error('Got modify event but no current revision found. Arn: {arn}'.format(arn=arn))
 
 
 def delete_record(old_image, durable_model):
@@ -48,10 +72,8 @@ def delete_record(old_image, durable_model):
     log.debug('Adding deletion marker.')
 
 
-def process_dynamodb_record(record, durable_model, diff_func):
+def process_dynamodb_record(record, durable_model, diff_func=default_diff):
     """Processes a group of DynamoDB NewImage records."""
-    log.info('Processing stream record...')
-
     arn = record['dynamodb']['Keys']['arn']['S']
 
     if record['eventName'] in ['INSERT', 'MODIFY']:
