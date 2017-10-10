@@ -48,6 +48,7 @@ class AWSHistoricalMixin(object):
     configuration = MapAttribute(null=True)
     userAgent = UnicodeAttribute(null=True)
     sourceIpAddress = UnicodeAttribute(null=True)
+    region = UnicodeAttribute(null=False)
     requestParameters = MapAttribute(null=True)
 
 
