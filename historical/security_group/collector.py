@@ -15,6 +15,7 @@ from raven_python_lambda import RavenLambdaWrapper
 
 from cloudaux.aws.ec2 import describe_security_groups
 
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
 from historical.common import cloudwatch
 from historical.common.kinesis import deserialize_records
 from historical.security_group.models import CurrentSecurityGroupModel
@@ -43,7 +44,7 @@ def get_arn(group_id, account_id):
     """Creates a security group ARN."""
     return 'arn:aws:ec2:{region}:{account_id}:security-group/{group_id}'.format(
         group_id=group_id,
-        region=os.environ['AWS_DEFAULT_REGION'],
+        region=CURRENT_REGION,
         account_id=account_id
     )
 
@@ -74,8 +75,8 @@ def describe_group(record):
         if vpc_id and group_name:
             return describe_security_groups(
                 account_number=account_id,
-                assume_role=os.environ.get('HISTORICAL_ROLE', 'Historical'),
-                region=os.environ['AWS_DEFAULT_REGION'],
+                assume_role=HISTORICAL_ROLE,
+                region=CURRENT_REGION,
                 Filters=[
                     {
                         'Name': 'group-name',
@@ -90,8 +91,8 @@ def describe_group(record):
         elif group_id:
             return describe_security_groups(
                 account_number=account_id,
-                assume_role=os.environ.get('HISTORICAL_ROLE', 'Historical'),
-                region=os.environ['AWS_DEFAULT_REGION'],
+                assume_role=HISTORICAL_ROLE,
+                region=CURRENT_REGION,
                 GroupIds=[group_id]
             )['SecurityGroups']
         else:
@@ -172,7 +173,8 @@ def capture_update_records(records):
             'Tags': group.get('Tags', []),
             'arn': get_arn(group['GroupId'], group['OwnerId']),
             'OwnerId': group['OwnerId'],
-            'configuration': group
+            'configuration': group,
+            'Region': cloudwatch.get_region(record)
         })
 
         log.debug('Writing Dynamodb Record. Records: {record}'.format(record=data))

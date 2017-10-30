@@ -13,10 +13,9 @@ from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
 
-from swag_client.backend import SWAGManager
-from swag_client.util import parse_swag_config_options
-
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
 from historical.security_group.models import security_group_polling_schema
+from historical.common.accounts import get_historical_accounts
 from historical.common.kinesis import produce_events
 
 logging.basicConfig()
@@ -36,27 +35,15 @@ def handler(event, context):
     """
     log.debug('Running poller. Configuration: {}'.format(event))
 
-    if os.environ.get('SWAG_BUCKET', False):
-        swag_opts = {
-            'swag.type': 's3',
-            'swag.bucket_name': os.environ['SWAG_BUCKET'],
-            'swag.data_file': os.environ.get('SWAG_DATA_FILE', 'accounts.json'),
-            'swag.region': os.environ.get('SWAG_REGION', 'us-east-1')
-        }
-        swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = swag.get_all("[?provider=='aws'] && [?owner=='{}']".format(os.environ['SWAG_OWNER']))
-    else:
-        accounts = os.environ['ENABLED_ACCOUNTS']
-
-    for account in accounts:
+    for account in get_historical_accounts():
         try:
             groups = describe_security_groups(
                 account_number=account['id'],
-                assume_role=os.environ.get('HISTORICAL_ROLE', 'Historical'),
-                region=os.environ['AWS_DEFAULT_REGION']
+                assume_role=HISTORICAL_ROLE,
+                region=CURRENT_REGION
             )
             events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
-            produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupStream'))
+            produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupPollerStream'))
             log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))
         except ClientError as e:
             log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(

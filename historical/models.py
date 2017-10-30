@@ -6,18 +6,17 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 .. author:: Mike Grima <mgrima@netflix.com>
 """
-import os
 import time
 from datetime import datetime
 
-from historical.attributes import EventTimeAttribute
 from marshmallow import Schema, fields
 from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
 
+from historical.constants import CURRENT_REGION
+from historical.attributes import EventTimeAttribute
+
+
 TTL_EXPIRY = 86400  # 24 Hours in seconds
-
-DYNAMO_REGION = os.environ.get("HISTORICAL_REGION", "us-east-1")
-
 
 EPHEMERAL_PATHS = [
 ]
@@ -42,6 +41,7 @@ class CurrentHistoricalModel(object):
 
 class AWSHistoricalMixin(object):
     arn = UnicodeAttribute(hash_key=True)
+    region = UnicodeAttribute(default=CURRENT_REGION)
     accountId = UnicodeAttribute()
     userIdentity = MapAttribute(null=True)
     principalId = UnicodeAttribute(null=True)

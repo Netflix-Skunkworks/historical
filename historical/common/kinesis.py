@@ -6,6 +6,8 @@ import base64
 
 import boto3
 
+from historical.constants import CURRENT_REGION
+
 
 def chunks(l, n):
     """Yield successive n-sized chunks from l."""
@@ -30,7 +32,7 @@ def produce_events(events, stream):
     is over the 5mb limit it attempts to back off the number of records until
     it falls below the 5mb limit.
     """
-    client = boto3.client('kinesis')
+    client = boto3.client('kinesis', region_name=CURRENT_REGION)
 
     events = [
         {

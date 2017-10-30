@@ -5,18 +5,22 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Mike Grima <mgrima@netflix.com>
 """
-import logging
 import os
 import uuid
-
-from botocore.exceptions import ClientError
-from cloudaux.aws.s3 import list_buckets
-from raven_python_lambda import RavenLambdaWrapper
-from swag_client.backend import SWAGManager
-from swag_client.util import parse_swag_config_options
-from historical.s3.models import s3_polling_schema
+import logging
 
 import boto3
+from botocore.exceptions import ClientError
+
+from cloudaux.aws.s3 import list_buckets
+
+from raven_python_lambda import RavenLambdaWrapper
+
+from swag_client.backend import SWAGManager
+from swag_client.util import parse_swag_config_options
+
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
+from historical.s3.models import s3_polling_schema
 
 logging.basicConfig()
 log = logging.getLogger("historical")
@@ -37,10 +41,10 @@ def create_polling_event(account):
     # Place onto the S3 Kinesis stream each S3 bucket for each account...
     # This should probably fan out on an account-by-account basis (we'll need to examine if this is an issue)
     all_buckets = list_buckets(account_number=account,
-                               assume_role=os.environ["HISTORICAL_ROLE"],
+                               assume_role=HISTORICAL_ROLE,
                                session_name="historical-cloudwatch-s3list",
-                               region=os.environ["HISTORICAL_REGION"])["Buckets"]
-    client = boto3.client("kinesis", region_name=os.environ["HISTORICAL_REGION"])
+                               region=CURRENT_REGION)["Buckets"]
+    client = boto3.client("kinesis", region_name=CURRENT_REGION)
 
     # Need to add all buckets into the stream:
     limiter = int(os.environ.get("MAX_BUCKET_BATCH", 50))

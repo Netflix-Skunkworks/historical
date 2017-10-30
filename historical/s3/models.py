@@ -9,8 +9,10 @@ from marshmallow import Schema, fields, post_dump
 from pynamodb.models import Model
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, MapAttribute
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
+
+from historical.constants import CURRENT_REGION
 from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AWSHistoricalMixin, \
-    HistoricalPollingEventDetail, HistoricalPollingBaseModel, DYNAMO_REGION
+    HistoricalPollingEventDetail, HistoricalPollingBaseModel
 
 
 class S3Model(object):
@@ -22,19 +24,19 @@ class S3Model(object):
 class DurableS3Model(Model, DurableHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3DurableTable'
-        region = DYNAMO_REGION
+        region = CURRENT_REGION
 
 
 class CurrentS3Model(Model, CurrentHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3CurrentTable'
-        region = DYNAMO_REGION
+        region = CURRENT_REGION
 
 
 class ViewIndex(GlobalSecondaryIndex):
     class Meta:
         projection = AllProjection()
-        region = DYNAMO_REGION
+        region = CURRENT_REGION
     view = NumberAttribute(default=0, hash_key=True)
 
 

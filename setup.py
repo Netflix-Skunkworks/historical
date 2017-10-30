@@ -31,7 +31,6 @@ install_requires = [
     'click==6.7',
     'pynamodb==3.1.0',
     'deepdiff==3.3.0',
-    'cloudaux',
     'raven-python-lambda',
     'marshmallow==2.13.5',
     'swag-client==0.2.9'
@@ -39,7 +38,7 @@ install_requires = [
 
 tests_require = [
     'pytest==3.1.3',
-    # 'moto==1.1.2',
+    'moto==1.1.2',
     'coveralls==1.1',
     'factory-boy==2.9.2'
 ]

@@ -6,7 +6,6 @@
 .. author:: Mike Grima <mgrima@netflix.com>
 """
 import logging
-import os
 from itertools import groupby
 
 from botocore.exceptions import ClientError
@@ -14,6 +13,7 @@ from pynamodb.exceptions import PynamoDBConnectionError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 
+from historical.constants import HISTORICAL_ROLE, CURRENT_REGION
 from historical.common import cloudwatch
 from historical.common.kinesis import deserialize_records
 from historical.s3.models import CurrentS3Model
@@ -137,8 +137,8 @@ def process_update_records(update_records):
                 bucket_details = get_bucket(b,
                                             account_number=account_id,
                                             include_created=(item.get("creationDate") is None),
-                                            assume_role=os.environ["HISTORICAL_ROLE"],
-                                            region=os.environ["HISTORICAL_REGION"])
+                                            assume_role=HISTORICAL_ROLE,
+                                            region=CURRENT_REGION)
                 if bucket_details.get("Error"):
                     log.error("Unable to fetch details about bucket: {}. "
                               "The error details are: {}".format(b, bucket_details["Error"]))

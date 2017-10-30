@@ -1,5 +1,6 @@
 import os
 import pytest
+from datetime import datetime
 
 import boto3
 
@@ -14,25 +15,25 @@ from moto.ec2 import mock_ec2
 @pytest.fixture(scope='function')
 def s3():
     with mock_s3():
-        yield boto3.client('s3')
+        yield boto3.client('s3', region_name='us-east-1')
 
 
 @pytest.fixture(scope='function')
 def ec2():
     with mock_ec2():
-        yield boto3.client('ec2')
+        yield boto3.client('ec2', region_name='us-east-1')
 
 
 @pytest.fixture(scope='function')
 def sts():
     with mock_sts():
-        yield boto3.client('sts')
+        yield boto3.client('sts', region_name='us-east-1')
 
 
 @pytest.fixture(scope='function')
 def iam():
     with mock_iam():
-        yield boto3.client('iam')
+        yield boto3.client('iam', region_name='us-east-1')
 
 
 @pytest.fixture(scope='function')
@@ -106,14 +107,63 @@ def buckets(s3):
         s3.put_bucket_tagging(
             Bucket='testbucket{}'.format(i),
             Tagging={
-                "TagSet": [
+                'TagSet': [
                     {
-                        "Key": "theBucketName",
-                        "Value": "testbucket{}".format(i)
+                        'Key': 'theBucketName',
+                        'Value': 'testbucket{}'.format(i)
                     }
                 ]
             }
         )
+        s3.put_bucket_lifecycle_configuration(Bucket='testbucket{}'.format(i), LifecycleConfiguration={
+            'Rules': [
+                {
+                    'Expiration': {
+                        'Date': datetime(2015, 1, 1),
+                        'Days': 123,
+                        'ExpiredObjectDeleteMarker': True | False
+                    },
+                    'ID': 'string',
+                    'Prefix': 'string',
+                    'Filter': {
+                        'Prefix': 'string',
+                        'Tag': {
+                            'Key': 'string',
+                            'Value': 'string'
+                        },
+                        'And': {
+                            'Prefix': 'string',
+                            'Tags': [
+                                {
+                                    'Key': 'string',
+                                    'Value': 'string'
+                                },
+                            ]
+                        }
+                    },
+                    'Status': 'Enabled',
+                    'Transitions': [
+                        {
+                            'Date': datetime(2015, 1, 1),
+                            'Days': 123,
+                            'StorageClass': 'GLACIER'
+                        },
+                    ],
+                    'NoncurrentVersionTransitions': [
+                        {
+                            'NoncurrentDays': 123,
+                            'StorageClass': 'GLACIER'
+                        },
+                    ],
+                    'NoncurrentVersionExpiration': {
+                        'NoncurrentDays': 123
+                    },
+                    'AbortIncompleteMultipartUpload': {
+                        'DaysAfterInitiation': 123
+                    }
+                }
+            ]
+        })
 
 
 @pytest.fixture(scope='function')
@@ -128,7 +178,6 @@ def security_groups(ec2):
 
 @pytest.fixture(scope='function')
 def mock_lambda_environment():
-    os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
     os.environ['SENTRY_ENABLED'] = 'f'
 
 

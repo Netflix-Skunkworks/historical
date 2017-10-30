@@ -11,13 +11,13 @@ from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, ListAttribute
 
+from historical.constants import CURRENT_REGION
 from historical.models import (
     HistoricalPollingEventDetail,
     HistoricalPollingBaseModel,
     DurableHistoricalModel,
     CurrentHistoricalModel,
-    AWSHistoricalMixin,
-    DYNAMO_REGION
+    AWSHistoricalMixin
 )
 
 
@@ -28,24 +28,25 @@ class SecurityGroupModel(object):
     OwnerId = UnicodeAttribute()
     Description = UnicodeAttribute()
     Tags = ListAttribute()
+    Region = UnicodeAttribute()
 
 
 class DurableSecurityGroupModel(Model, DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupDurableTable'
-        region = DYNAMO_REGION
+        region = CURRENT_REGION
 
 
 class CurrentSecurityGroupModel(Model, CurrentHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupCurrentTable'
-        region = DYNAMO_REGION
+        region = CURRENT_REGION
 
 
 class ViewIndex(GlobalSecondaryIndex):
     class Meta:
         projection = AllProjection()
-        region = DYNAMO_REGION
+        region = CURRENT_REGION
 
     view = NumberAttribute(default=0, hash_key=True)
 

@@ -22,6 +22,7 @@ SECURITY_GROUP = {
     'accountId': '123456789012',
     'OwnerId': '123456789012',
     'Description': 'This is a test',
+    'Region': 'us-east-1',
     'Tags': [{'Name': 'test', 'Value': '<empty>'}],
     'configuration': {
         'Description': 'string',
