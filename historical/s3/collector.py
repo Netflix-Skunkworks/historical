@@ -128,7 +128,7 @@ def process_update_records(update_records):
             buckets[e["detail"]["requestParameters"]["bucketName"]] = bucket_event
             buckets[e["detail"]["requestParameters"]["bucketName"]]["eventDetails"] = e
 
-        # query AWS for current configuration
+        # Query AWS for current configuration
         for b, item in buckets.items():
             print("Processing Create/Update for: {}".format(b))
             # If the bucket does not exist, then simply drop the request --

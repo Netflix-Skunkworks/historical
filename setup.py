@@ -26,19 +26,19 @@ with open(os.path.join(ROOT, "historical", "__about__.py")) as f:
 
 
 install_requires = [
-    'cloudaux',
+    'cloudaux==1.4.0',
     'boto3>=1.4.4',
     'click==6.7',
     'pynamodb==3.1.0',
     'deepdiff==3.3.0',
     'raven-python-lambda',
     'marshmallow==2.13.5',
-    'swag-client==0.2.9'
+    'swag-client==0.2.9',
 ]
 
 tests_require = [
     'pytest==3.1.3',
-    'moto==1.1.2',
+    'moto==1.1.24',
     'coveralls==1.1',
     'factory-boy==2.9.2'
 ]
