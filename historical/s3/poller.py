@@ -37,7 +37,7 @@ def get_record(all_buckets, index, account):
     }
 
 
-def create_polling_event(account):
+def create_polling_event(account, stream):
     # Place onto the S3 Kinesis stream each S3 bucket for each account...
     # This should probably fan out on an account-by-account basis (we'll need to examine if this is an issue)
     all_buckets = list_buckets(account_number=account,
@@ -58,7 +58,7 @@ def create_polling_event(account):
             records.append(get_record(all_buckets, offset, account))
             offset += 1
 
-        client.put_records(Records=records, StreamName=os.environ["HISTORICAL_STREAM"])
+        client.put_records(Records=records, StreamName=stream)
         current_batch += 1
 
     # Process remainder:
@@ -68,7 +68,7 @@ def create_polling_event(account):
             records.append(get_record(all_buckets, offset, account))
             offset += 1
 
-        client.put_records(Records=records, StreamName=os.environ["HISTORICAL_STREAM"])
+        client.put_records(Records=records, StreamName=stream)
 
 
 @RavenLambdaWrapper()
@@ -100,7 +100,7 @@ def handler(event, context):
     for account in accounts:
         # Skip accounts that have role assumption errors:
         try:
-            create_polling_event(account)
+            create_polling_event(account, os.environ.get("HISTORICAL_STREAM", "HistoricalS3PollerStream"))
         except ClientError as e:
             log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
                 account_id=account,
