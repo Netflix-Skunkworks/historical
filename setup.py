@@ -64,5 +64,10 @@ setup(
             'historical = historical.cli:cli',
         ]
     },
-    keywords=['aws', 'account_management']
+    keywords=['aws', 'account_management'],
+    classifiers=[
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+    ],
 )
