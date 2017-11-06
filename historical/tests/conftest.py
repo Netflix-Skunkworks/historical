@@ -1,3 +1,11 @@
+"""
+.. module: historical.tests.test_s3
+    :platform: Unix
+    :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
+    :license: Apache, see LICENSE for more details.
+.. author:: Kevin Glisson <kglisson@netflix.com>
+.. author:: Mike Grima <mgrima@netflix.com>
+"""
 import os
 import pytest
 from datetime import datetime
@@ -207,4 +215,3 @@ def current_s3_table(dynamodb):
 def durable_s3_table(dynamodb):
     from historical.s3.models import DurableS3Model
     yield DurableS3Model.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
-

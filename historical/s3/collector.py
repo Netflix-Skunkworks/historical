@@ -1,5 +1,5 @@
 """
-.. module: historical.security_group.collector
+.. module: historical.s3.collector
     :platform: Unix
     :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.
