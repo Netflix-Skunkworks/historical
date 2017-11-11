@@ -104,8 +104,8 @@ def process_delete_records(delete_records):
             model.delete()
 
         except PynamoDBConnectionError as pdce:
-            log.warn("Unable to delete bucket: {}. Either it doesn't exist, or this deletion event "
-                     "arrived after a creation/update. The specific exception is: {}".format(arn, pdce))
+            log.warn("Unable to delete bucket: {}. Either it doesn't exist, or this deletion event is stale "
+                     "(arrived before a NEWER creation/update). The specific exception is: {}".format(arn, pdce))
 
 
 def process_update_records(update_records):

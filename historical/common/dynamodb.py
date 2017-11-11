@@ -95,7 +95,13 @@ def process_dynamodb_record(record, durable_model, diff_func=None):
             modify_record(durable_model, current_revision, arn, data['eventTime'], diff_func)
 
     if record['eventName'] == 'REMOVE':
-        # only track deletes that are from the dynamodb TTL service
+        # We are *ONLY* tracking the deletions from the DynamoDB TTL service.
+        # Why? Because when we process deletion records, we are first saving a new "empty" revision to the "Current"
+        # table. The "empty" revision will then trigger this Lambda as a "MODIFY" event. Then, right after it saves
+        # the "empty" revision, it will then delete the item from the "Current" table. At that point,
+        # we have already saved the "deletion revision" to the "Historical" table. Thus, no need to process
+        # the deletion events -- except for TTL expirations (which should never happen -- but if they do, you need
+        # to investigate why...)
         if record.get('userIdentity'):
             if record['userIdentity']['type'] == 'Service':
                 if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
