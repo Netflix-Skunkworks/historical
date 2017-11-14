@@ -23,8 +23,8 @@ def default_diff(latest_config, current_config):
 def remove_current_specific_fields(obj):
     """Remove all fields that belong to the Current table -- that don't belong in the Durable table"""
     # TTL:
-    if obj.get('ttl'):
-        del obj['ttl']
+    obj.pop("ttl", None)
+
     return obj
 
 
@@ -72,6 +72,25 @@ def delete_record(old_image, durable_model):
     log.debug('Adding deletion marker.')
 
 
+def deserialize_current_dynamo_to_pynamo(record, model):
+    """
+    Utility function that will take a dynamo event record and turn it into the proper pynamo object.
+
+    This will remove the "current table" specific fields, and properly deserialize the ugly Dynamo datatypes away.
+    :param record:
+    :param model:
+    :return:
+    """
+    new_image = remove_current_specific_fields(record['dynamodb']['NewImage'])
+    data = {}
+
+    for item in new_image:
+        # This could end up as loss of precision
+        data[item] = deser.deserialize(new_image[item])
+
+    return model(**data)
+
+
 def process_dynamodb_record(record, durable_model, diff_func=None):
     """Processes a group of DynamoDB NewImage records."""
     diff_func = diff_func or default_diff
@@ -79,20 +98,14 @@ def process_dynamodb_record(record, durable_model, diff_func=None):
     arn = record['dynamodb']['Keys']['arn']['S']
 
     if record['eventName'] in ['INSERT', 'MODIFY']:
-        new = remove_current_specific_fields(record['dynamodb']['NewImage'])
-        data = {}
+        current_revision = deserialize_current_dynamo_to_pynamo(record, durable_model)
 
-        for item in new:
-            # this could end up as loss of precision
-            data[item] = deser.deserialize(new[item])
-
-        current_revision = durable_model(**data)
         if record['eventName'] == 'INSERT':
             current_revision.save()
             log.debug('Saving new revision to durable table.')
 
         elif record['eventName'] == 'MODIFY':
-            modify_record(durable_model, current_revision, arn, data['eventTime'], diff_func)
+            modify_record(durable_model, current_revision, arn, current_revision.eventTime, diff_func)
 
     if record['eventName'] == 'REMOVE':
         # We are *ONLY* tracking the deletions from the DynamoDB TTL service.
