@@ -14,7 +14,7 @@ def get_historical_accounts():
             'swag.region': os.environ.get('SWAG_REGION', 'us-east-1')
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = swag.get_all("[?provider=='aws'] && [?owner=='{}']".format(os.environ['SWAG_OWNER']))
+        accounts = swag.get_service_enabled('historical', search_filter="[?provider=='aws'] && [?owner=='{}']".format(os.environ['SWAG_OWNER']))
     else:
         accounts = os.environ['ENABLED_ACCOUNTS']
 
