@@ -58,7 +58,7 @@ def swag_accounts(s3):
     bucket_name = 'SWAG'
     data_file = 'accounts.json'
     region = 'us-east-1'
-    owner = 'example'
+    owner = 'third-party'
 
     s3.create_bucket(Bucket=bucket_name)
     os.environ['SWAG_BUCKET'] = bucket_name
@@ -84,9 +84,20 @@ def swag_accounts(s3):
         'environment': 'test',
         'id': '012345678910',
         'name': 'testaccount',
-        'owner': 'example',
+        'owner': 'third-party',
         'provider': 'aws',
-        'sensitive': False
+        'sensitive': False,
+        'services': [
+            {
+                'name': 'historical',
+                'status': [
+                    {
+                        'region': 'all',
+                        'enabled': True
+                    }
+                ]
+            }
+        ]
     }
 
     swag.create(account)
