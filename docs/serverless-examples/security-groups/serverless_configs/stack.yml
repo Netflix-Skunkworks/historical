@@ -1,0 +1,6 @@
+accountId: YOURACCOUNTIDHERE
+pythonRequirements:
+    dockerizePip: true
+prune:
+  automatic: true
+  number: 3

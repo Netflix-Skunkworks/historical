@@ -1,0 +1,281 @@
+service: "historical-s3"
+
+provider:
+  name: aws
+  runtime: python3.6
+  memorySize: 512
+  timeout: 300
+  deploymentBucket:
+    name: YOUR-DEPLOYMENT-BUCKET-HERE
+
+custom: ${file(serverless_configs/${opt:stage}.yml)}
+
+functions:
+  Collector:
+    handler: historical.s3.collector.handler
+    description: Processes polling and cloudwatch events for S3.
+    tags:
+      owner: YOUREMAILHERE@YOURCOMPANYHERE.COM
+    role: arn:aws:iam::${self:custom.accountId}:role/<IAM-ROLE-TO-RUN-THE-HISTORICAL-LAMBDAS>
+    events:
+       - stream:
+           type: kinesis
+           arn:
+             Fn::GetAtt:
+               - HistoricalS3Stream
+               - Arn
+           batchSize: 20
+           startingPosition: LATEST
+       - stream:
+           type: kinesis
+           arn:
+             Fn::GetAtt:
+               - HistoricalS3PollerStream
+               - Arn
+           batchSize: 20
+           startingPosition: LATEST
+    environment:
+      SENTRY_DSN: <SENTRY-DSN HERE IF YOU WANT TO USE IT>
+
+  Poller:
+    handler: historical.s3.poller.handler
+    description: Scheduled event that describes S3 Buckets.
+    tags:
+      owner: YOUREMAILHERE@YOURCOMPANYHERE.COM
+    role: arn:aws:iam::${self:custom.accountId}:role/<IAM-ROLE-TO-RUN-THE-HISTORICAL-LAMBDAS>
+    environment:
+      SENTRY_DSN: <SENTRY-DSN HERE IF YOU WANT TO USE IT>
+      SWAG_BUCKET: <SWAG-BUCKET-HERE>
+      SWAG_REGION: <SWAG-REGION-HERE>
+      SWAG_DATA_FILE: <SWAG-ACCOUNT-JSON-PATH-HERE>
+      SWAG_OWNER: <YOUR-COMPANY-NAME-HERE-THAT-IS-IN-THE-SWAG-OWNER-FIELD>
+
+  Differ:
+    handler: historical.s3.differ.handler
+    description: Stream based function that is resposible for finding differences.
+    tags:
+      owner: YOUREMAILHERE@YOURCOMPANYHERE.COM
+    role: arn:aws:iam::${self:custom.accountId}:role/<IAM-ROLE-TO-RUN-THE-HISTORICAL-LAMBDAS>
+    events:
+      - stream:
+         type: dynamodb
+         arn:
+           Fn::GetAtt:
+             - HistoricalS3CurrentTable
+             - StreamArn
+    environment:
+      SENTRY_DSN: <SENTRY-DSN HERE IF YOU WANT TO USE IT>
+
+resources:
+  Resources:
+    # The Kinesis Stream -- Where the events will go:
+    HistoricalS3Stream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: HistoricalS3Stream
+        ShardCount: 1
+
+    # The Kinesis Polling Stream -- Where the polling events will go:
+    HistoricalS3PollerStream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: HistoricalS3PollerStream
+        ShardCount: 3
+
+    # The events -- these will be placed on the Kinesis stream:
+    CloudWatchEventRule:
+      Type: AWS::Events::Rule
+      DependsOn:
+        - HistoricalS3Stream
+      Properties:
+        Description: EventRule forwarding S3 Bucket changes.
+        EventPattern:
+          source:
+            - aws.s3
+          detail-type:
+            - AWS API Call via CloudTrail
+          detail:
+            eventSource:
+              - s3.amazonaws.com
+            eventName:
+              - DeleteBucket
+              - DeleteBucketCors
+              - DeleteBucketLifecycle
+              - DeleteBucketPolicy
+              - DeleteBucketReplication
+              - DeleteBucketTagging
+              - DeleteBucketWebsite
+              - CreateBucket
+              - PutBucketAcl
+              - PutBucketCors
+              - PutBucketLifecycle
+              - PutBucketPolicy
+              - PutBucketLogging
+              - PutBucketNotification
+              - PutBucketReplication
+              - PutBucketTagging
+              - PutBucketRequestPayment
+              - PutBucketVersioning
+              - PutBucketWebsite
+        State: ENABLED
+        Targets:
+          -
+            Arn:
+              Fn::GetAtt:
+                - HistoricalS3Stream
+                - Arn
+            Id: EventStream
+            RoleArn: arn:aws:iam::${self:custom.accountId}:role/service-role/<IAM-SERVICE-ROLE-FOR-CW-EVENTS-TO-INVOKE-KINESIS>
+
+    # The "Current" DynamoDB table:
+    HistoricalS3CurrentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: HistoricalS3CurrentTable
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        AttributeDefinitions:
+          - AttributeName: arn
+            AttributeType: S
+        KeySchema:
+          - AttributeName: arn
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 50
+          WriteCapacityUnits: 50
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    # The Durable (Historical) change DynamoDB table:
+    HistoricalS3DurableTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: HistoricalS3DurableTable
+        AttributeDefinitions:
+          - AttributeName: arn
+            AttributeType: S
+          - AttributeName: eventTime
+            AttributeType: S
+        KeySchema:
+          - AttributeName: arn
+            KeyType: HASH
+          - AttributeName: eventTime
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 30
+          WriteCapacityUnits: 30
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    # Lambdas
+    CollectorLambdaFunction:
+      Type: AWS::Lambda::Function
+      DependsOn:
+        - HistoricalS3Stream
+        - HistoricalS3PollerStream
+
+    DifferLambdaFunction:
+      Type: AWS::Lambda::Function
+      DependsOn:
+        - HistoricalS3CurrentTable
+
+    PollerScheduledRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Description: ScheduledRule
+        ScheduleExpression: rate(4 hours)
+        State: ENABLED
+        Targets:
+          -
+            Arn:
+              Fn::GetAtt:
+                - PollerLambdaFunction
+                - Arn
+            Id: TargetFunctionV1
+
+    # Permission to invoke Lambdas:
+    PermissionForEventsToInvokeLambda:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName:
+          Ref: PollerLambdaFunction
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        SourceArn:
+          Fn::GetAtt:
+            - PollerScheduledRule
+            - Arn
+
+    # Log group -- 1 for each function...
+    CollectorLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+    PollerLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+    DifferLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+  # Outputs -- for use in other dependent Historical deployments:
+  Outputs:
+    HistoricalS3StreamArn:
+      Description: Historical S3 Event Kinesis Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalS3Stream
+          - Arn
+      Export:
+        Name: HistoricalS3StreamArn
+
+    HistoricalS3PollerStreamArn:
+      Description: Historical S3 Poller Kinesis Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalS3PollerStream
+          - Arn
+      Export:
+        Name: HistoricalS3PollerStreamArn
+
+    HistoricalS3CurrentTableArn:
+      Description: Historical S3 Current DynamoDB Table ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalS3CurrentTable
+          - Arn
+      Export:
+        Name: HistoricalS3CurrentTableArn
+
+    HistoricalS3CurrentTableStreamArn:
+      Description: Historical S3 Current DynamoDB Table Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalS3CurrentTable
+          - StreamArn
+      Export:
+        Name: HistoricalS3CurrentTableStreamArn
+
+    HistoricalS3DurableTableArn:
+      Description: Historical S3 Durable DynamoDB Table ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalS3DurableTable
+          - Arn
+      Export:
+        Name: HistoricalS3DurableTableArn
+
+    HistoricalS3DurableTableStreamArn:
+      Description: Historical S3 Durable DynamoDB Table Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalS3DurableTable
+          - StreamArn
+      Export:
+        Name: HistoricalS3DurableTableStreamArn
+
+plugins:
+  - serverless-python-requirements
+  - serverless-prune-plugin

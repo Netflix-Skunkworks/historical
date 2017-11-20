@@ -1,0 +1,267 @@
+service: "historical-securitygroup"
+
+provider:
+  name: aws
+  runtime: python3.6
+  memorySize: 512
+  timeout: 300
+  deploymentBucket:
+    name: YOUR-DEPLOYMENT-BUCKET-HERE
+
+custom: ${file(serverless_configs/${opt:stage}.yml)}
+
+functions:
+  Collector:
+    handler: historical.security_group.collector.handler
+    description: Processes polling and cloudwatch events for Security Groups.
+    tags:
+      owner: YOUREMAILHERE@YOURCOMPANYHERE.COM
+    role: arn:aws:iam::${self:custom.accountId}:role/<IAM-ROLE-TO-RUN-THE-HISTORICAL-LAMBDAS>
+    events:
+       - stream:
+           type: kinesis
+           arn:
+             Fn::GetAtt:
+               - HistoricalSecurityGroupStream
+               - Arn
+           batchSize: 20
+           startingPosition: LATEST
+       - stream:
+           type: kinesis
+           arn:
+             Fn::GetAtt:
+               - HistoricalSecurityGroupPollerStream
+               - Arn
+           batchSize: 20
+           startingPosition: LATEST
+    environment:
+      SENTRY_DSN: <SENTRY-DSN HERE IF YOU WANT TO USE IT>
+
+  Poller:
+    handler: historical.security_group.poller.handler
+    description: Scheduled event that describes security groups.
+    tags:
+      owner: YOUREMAILHERE@YOURCOMPANYHERE.COM
+    role: arn:aws:iam::${self:custom.accountId}:role/<IAM-ROLE-TO-RUN-THE-HISTORICAL-LAMBDAS>
+    environment:
+      SENTRY_DSN: <SENTRY-DSN HERE IF YOU WANT TO USE IT>
+      SWAG_BUCKET: <SWAG-BUCKET-HERE>
+      SWAG_REGION: <SWAG-REGION-HERE>
+      SWAG_DATA_FILE: <SWAG-ACCOUNT-JSON-PATH-HERE>
+      SWAG_OWNER: <YOUR-COMPANY-NAME-HERE-THAT-IS-IN-THE-SWAG-OWNER-FIELD>
+
+  Differ:
+    handler: historical.security_group.differ.handler
+    description: Stream based function that is resposible for finding differences.
+    tags:
+      owner: YOUREMAILHERE@YOURCOMPANYHERE.COM
+    role: arn:aws:iam::${self:custom.accountId}:role/<IAM-ROLE-TO-RUN-THE-HISTORICAL-LAMBDAS>
+    events:
+      - stream:
+         type: dynamodb
+         arn:
+           Fn::GetAtt:
+             - HistoricalSecurityGroupCurrentTable
+             - StreamArn
+    environment:
+      SENTRY_DSN: <SENTRY-DSN HERE IF YOU WANT TO USE IT>
+
+resources:
+  Resources:
+    # The Kinesis Stream -- Where the events will go:
+    HistoricalSecurityGroupStream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: HistoricalSecurityGroupStream
+        ShardCount: 1
+
+    # The Kinesis Polling Stream -- Where the polling events will go:
+    HistoricalSecurityGroupPollerStream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: HistoricalSecurityGroupPollerStream
+        ShardCount: 3
+
+    # The events -- these will be placed on the Kinesis stream:
+    CloudWatchEventRule:
+      Type: AWS::Events::Rule
+      DependsOn:
+        - HistoricalSecurityGroupStream
+      Properties:
+        Description: EventRule forwarding security group changes.
+        EventPattern:
+          source:
+            - aws.ec2
+          detail-type:
+            - AWS API Call via CloudTrail
+          detail:
+            eventSource:
+              - ec2.amazonaws.com
+            eventName:
+              - AuthorizeSecurityGroupEgress
+              - AuthorizeSecurityGroupIngress
+              - RevokeSecurityGroupEgress
+              - RevokeSecurityGroupIngress
+              - CreateSecurityGroup
+              - DeleteSecurityGroup
+        State: ENABLED
+        Targets:
+          -
+            Arn:
+              Fn::GetAtt:
+                - HistoricalSecurityGroupStream
+                - Arn
+            Id: EventStream
+            RoleArn: arn:aws:iam::${self:custom.accountId}:role/service-role/<IAM-SERVICE-ROLE-FOR-CW-EVENTS-TO-INVOKE-KINESIS>
+
+    # The "Current" DynamoDB table:
+    HistoricalSecurityGroupCurrentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: HistoricalSecurityGroupCurrentTable
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        AttributeDefinitions:
+          - AttributeName: arn
+            AttributeType: S
+        KeySchema:
+          - AttributeName: arn
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 100
+          WriteCapacityUnits: 100
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    # The Durable (Historical) change DynamoDB table:
+    HistoricalSecurityGroupDurableTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: HistoricalSecurityGroupDurableTable
+        AttributeDefinitions:
+          - AttributeName: arn
+            AttributeType: S
+          - AttributeName: eventTime
+            AttributeType: S
+        KeySchema:
+          - AttributeName: arn
+            KeyType: HASH
+          - AttributeName: eventTime
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 100
+          WriteCapacityUnits: 100
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    # Lambdas
+    CollectorLambdaFunction:
+      Type: AWS::Lambda::Function
+      DependsOn:
+        - HistoricalSecurityGroupStream
+
+    DifferLambdaFunction:
+      Type: AWS::Lambda::Function
+      DependsOn:
+        - HistoricalSecurityGroupCurrentTable
+
+    PollerScheduledRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Description: ScheduledRule
+        ScheduleExpression: rate(60 minutes)
+        State: ENABLED
+        Targets:
+          -
+            Arn:
+              Fn::GetAtt:
+                - PollerLambdaFunction
+                - Arn
+            Id: TargetFunctionV1
+
+    # Permission to invoke Lambdas:
+    PermissionForEventsToInvokeLambda:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName:
+          Ref: PollerLambdaFunction
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        SourceArn:
+          Fn::GetAtt:
+            - PollerScheduledRule
+            - Arn
+
+    # Log group -- 1 for each function...
+    CollectorLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+    PollerLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+    DifferLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+  # Outputs -- for use in other dependent Historical deployments:
+  Outputs:
+    HistoricalSecurityGroupStreamArn:
+      Description: Historical Security Group Event Kinesis Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalSecurityGroupStream
+          - Arn
+      Export:
+        Name: HistoricalSecurityGroupStreamArn
+
+    HistoricalSecurityGroupPollerStreamArn:
+      Description: Historical Security Group Poller Kinesis Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalSecurityGroupPollerStream
+          - Arn
+      Export:
+        Name: HistoricalSecurityGroupPollerStreamArn
+
+    HistoricalSecurityGroupCurrentTableArn:
+      Description: Historical Security Group Current DynamoDB Table ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalSecurityGroupCurrentTable
+          - Arn
+      Export:
+        Name: HistoricalSecurityGroupCurrentTableArn
+
+    HistoricalSecurityGroupCurrentTableStreamArn:
+      Description: Historical Security Group Current DynamoDB Table Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalSecurityGroupCurrentTable
+          - StreamArn
+      Export:
+        Name: HistoricalSecurityGroupCurrentTableStreamArn
+
+    HistoricalSecurityGroupDurableTableArn:
+      Description: Historical Security Group Durable DynamoDB Table ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalSecurityGroupDurableTable
+          - Arn
+      Export:
+        Name: HistoricalSecurityGroupDurableTableArn
+
+    HistoricalSecurityGroupDurableTableStreamArn:
+      Description: Historical Security Group Durable DynamoDB Table Stream ARN
+      Value:
+        Fn::GetAtt:
+          - HistoricalSecurityGroupDurableTable
+          - StreamArn
+      Export:
+        Name: HistoricalSecurityGroupDurableTableStreamArn
+
+plugins:
+  - serverless-python-requirements
+  - serverless-prune-plugin
