@@ -22,7 +22,7 @@ Key Features:
 | Service Name | Development Status |
 | ------------ | ------------------ |
 | iam.roles    | In-progress        |
-| ec2.security_groups | In-progress |
+| ec2.security_groups | Complete ✅ |
 | s3           | Complete ✅       |
 | route53      | In-progress        |
 
