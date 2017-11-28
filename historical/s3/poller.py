@@ -16,11 +16,9 @@ from cloudaux.aws.s3 import list_buckets
 
 from raven_python_lambda import RavenLambdaWrapper
 
-from swag_client.backend import SWAGManager
-from swag_client.util import parse_swag_config_options
-
 from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
 from historical.s3.models import s3_polling_schema
+from historical.common.accounts import get_historical_accounts
 
 logging.basicConfig()
 log = logging.getLogger("historical")
@@ -83,28 +81,14 @@ def handler(event, context):
     """
     log.debug('Running poller. Configuration: {}'.format(event))
 
-    # Get the queue that we are going to place the events in:
-    if os.environ['SWAG_BUCKET']:
-        swag_opts = {
-            'swag.type': 's3',
-            'swag.bucket_name': os.environ['SWAG_BUCKET'],
-            'swag.data_file': os.environ['SWAG_DATA_FILE'],
-            'swag.region': os.environ['SWAG_REGION'],
-            'swag.cache_expires': 0
-        }
-        swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = [account["id"] for account in swag.get_all("[?provider=='aws']")]
-    else:
-        accounts = os.environ['ENABLED_ACCOUNTS']
-
-    for account in accounts:
+    for account in get_historical_accounts():
         # Skip accounts that have role assumption errors:
         try:
-            create_polling_event(account, os.environ.get("HISTORICAL_STREAM", "HistoricalS3PollerStream"))
+            create_polling_event(account['id'], os.environ.get("HISTORICAL_STREAM", "HistoricalS3PollerStream"))
         except ClientError as e:
             log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
-                account_id=account,
+                account_id=account['id'],
                 reason=e
             ))
 
-    log.debug('Finished generating polling events. Events Created: {}'.format(len(accounts)))
+        log.debug('Finished generating polling events. Events Created: {}'.format(len(account['id'])))
