@@ -1,5 +1,5 @@
 """
-.. module: historical.tests.test_s3
+.. module: historical.tests.test_security_group
     :platform: Unix
     :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.

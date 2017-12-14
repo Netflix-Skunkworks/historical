@@ -10,6 +10,8 @@ Helper functions for processing cloudwatch events.
 import logging
 from datetime import datetime
 
+from historical.constants import CURRENT_REGION
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +41,7 @@ def get_principal(event):
 
 def get_region(event):
     """Get region from event details."""
-    return event['detail'].get('awsRegion')
+    return event['detail'].get('awsRegion', CURRENT_REGION)
 
 
 def get_event_time(event):

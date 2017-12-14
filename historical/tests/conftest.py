@@ -196,6 +196,16 @@ def security_groups(ec2):
 
 
 @pytest.fixture(scope='function')
+def vpcs(ec2):
+    """Creates vpcs."""
+    yield ec2.create_vpc(
+        CidrBlock='192.168.1.1/32',
+        AmazonProvidedIpv6CidrBlock=True,
+        InstanceTenancy='default'
+    )['Vpc']
+
+
+@pytest.fixture(scope='function')
 def mock_lambda_environment():
     os.environ['SENTRY_ENABLED'] = 'f'
 
@@ -213,6 +223,22 @@ def durable_security_group_table():
     from historical.security_group.models import DurableSecurityGroupModel
     mock_dynamodb2().start()
     yield DurableSecurityGroupModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
+    mock_dynamodb2().stop()
+
+
+@pytest.fixture(scope='function')
+def current_vpc_table():
+    from historical.vpc.models import CurrentVPCModel
+    mock_dynamodb2().start()
+    yield CurrentVPCModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
+    mock_dynamodb2().stop()
+
+
+@pytest.fixture(scope='function')
+def durable_vpc_table():
+    from historical.vpc.models import DurableVPCModel
+    mock_dynamodb2().start()
+    yield DurableVPCModel.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
     mock_dynamodb2().stop()
 
 
