@@ -23,6 +23,7 @@ Key Features:
 | ------------ | ------------------ |
 | iam.roles    | In-progress        |
 | ec2.security_groups | Complete ✅ |
+| ec2.vpc | Complete ✅ |
 | ec2.elb | In-progress |
 | s3           | Complete ✅       |
 | route53      | In-progress        |
