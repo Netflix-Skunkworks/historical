@@ -33,7 +33,7 @@ install_requires = [
     'deepdiff==3.3.0',
     'raven-python-lambda',
     'marshmallow==2.13.5',
-    'swag-client==0.3.0',
+    'swag-client>=0.3.0',
 ]
 
 tests_require = [
