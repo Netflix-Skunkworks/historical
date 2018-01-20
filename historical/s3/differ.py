@@ -23,7 +23,7 @@ log.setLevel(logging.WARNING)
 # Path to where in the dict the ephemeral field is -- starting with "root['M'][PathInConfigDontForgetDataType]..."
 EPHEMERAL_PATHS = [
     # Configuration level changes are don't care about:
-    "root['M']['_version']"
+    "root['configuration']['M']['_version']"
 ]
 
 

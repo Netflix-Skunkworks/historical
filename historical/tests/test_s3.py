@@ -342,8 +342,6 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     ephemeral_changes["eventTime"] = \
         datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     ephemeral_changes["configuration"]["_version"] = 99999
-    ephemeral_changes["principalId"] = "someoneelse@example.com"
-    ephemeral_changes["userIdentity"]["sessionContext"]["userName"] = "someoneelse"
     ephemeral_changes["ttl"] = ttl
 
     data = DynamoDBRecordsFactory(

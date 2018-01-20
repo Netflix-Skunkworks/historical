@@ -89,7 +89,7 @@ def test_durable_table(durable_vpc_table):
     items = list(DurableVPCModel.query('arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343'))
 
     assert len(items) == 1
-    assert not getattr(items[0], "ttl", None)
+    assert not getattr(items[0], 'ttl', None)
 
     VPC['eventTime'] = datetime(2017, 5, 12, 23, 30)
     DurableVPCModel(**VPC).save()
@@ -104,11 +104,11 @@ def test_poller(historical_kinesis, historical_role, mock_lambda_environment, vp
     handler(None, None)
 
     shard_id = historical_kinesis.describe_stream(
-        StreamName="historicalstream")["StreamDescription"]["Shards"][0]["ShardId"]
+        StreamName='historicalstream')['StreamDescription']['Shards'][0]['ShardId']
     iterator = historical_kinesis.get_shard_iterator(
-        StreamName="historicalstream", ShardId=shard_id, ShardIteratorType="AT_SEQUENCE_NUMBER",
-        StartingSequenceNumber="0")
-    records = historical_kinesis.get_records(ShardIterator=iterator["ShardIterator"])
+        StreamName='historicalstream', ShardId=shard_id, ShardIteratorType='AT_SEQUENCE_NUMBER',
+        StartingSequenceNumber='0')
+    records = historical_kinesis.get_records(ShardIterator=iterator['ShardIterator'])
     assert len(records['Records']) == 2
 
 
@@ -120,7 +120,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     ttl = int(time.time() + TTL_EXPIRY)
     new_vpc = VPC.copy()
     new_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
-    new_vpc["ttl"] = ttl
+    new_vpc['ttl'] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -141,7 +141,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
 
     duplicate_vpc = VPC.copy()
     duplicate_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
-    duplicate_vpc["ttl"] = ttl
+    duplicate_vpc['ttl'] = ttl
     # ensure no new record for the same data
     data = DynamoDBRecordsFactory(
         records=[
@@ -163,7 +163,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     updated_vpc = VPC.copy()
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['State'] = 'changeme'
-    updated_vpc["ttl"] = ttl
+    updated_vpc['ttl'] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -184,7 +184,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     updated_vpc = VPC.copy()
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['CidrBlock'] = 'changeme'
-    updated_vpc["ttl"] = ttl
+    updated_vpc['ttl'] = ttl
     data = DynamoDBRecordsFactory(
         records=[
             DynamoDBRecordFactory(
@@ -202,9 +202,30 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     handler(data, None)
     assert DurableVPCModel.count() == 3
 
+    updated_vpc = VPC.copy()
+    updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=31, second=0).isoformat() + 'Z'
+    updated_vpc.update({'Name': 'blah'})
+    updated_vpc['ttl'] = ttl
+    data = DynamoDBRecordsFactory(
+        records=[
+            DynamoDBRecordFactory(
+                dynamodb=DynamoDBDataFactory(
+                    NewImage=updated_vpc,
+                    Keys={
+                        'arn': VPC['arn']
+                    }
+                ),
+                eventName='MODIFY'
+            )
+        ]
+    )
+    data = json.loads(json.dumps(data, default=serialize))
+    handler(data, None)
+    assert DurableVPCModel.count() == 4
+
     deleted_vpc = VPC.copy()
     deleted_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
-    deleted_vpc["ttl"] = ttl
+    deleted_vpc['ttl'] = ttl
 
     # ensure new record
     data = DynamoDBRecordsFactory(
@@ -226,7 +247,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     )
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
-    assert DurableVPCModel.count() == 4
+    assert DurableVPCModel.count() == 5
 
 
 def test_collector(historical_role, mock_lambda_environment, vpcs, current_vpc_table):

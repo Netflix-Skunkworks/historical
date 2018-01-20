@@ -22,9 +22,7 @@ def default_diff(latest_config, current_config):
 
 def remove_current_specific_fields(obj):
     """Remove all fields that belong to the Current table -- that don't belong in the Durable table"""
-    # TTL:
     obj.pop("ttl", None)
-
     return obj
 
 
@@ -42,8 +40,8 @@ def modify_record(durable_model, current_revision, arn, event_time, diff_func):
     if items:
         latest_revision = items[0]
 
-        latest_config = latest_revision._get_json()[1]['attributes']['configuration']
-        current_config = current_revision._get_json()[1]['attributes']['configuration']
+        latest_config = latest_revision._get_json()[1]['attributes']
+        current_config = current_revision._get_json()[1]['attributes']
 
         # Determine if there is truly a difference, disregarding Ephemeral Paths
         diff = diff_func(latest_config, current_config)
