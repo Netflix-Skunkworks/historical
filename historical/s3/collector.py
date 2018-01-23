@@ -78,7 +78,7 @@ def create_delete_model(record):
         'accountId': record['account'],
         'eventTime': record['detail']['eventTime'],
         'BucketName': cloudwatch.filter_request_parameters('bucketName', record),
-        'Region': cloudwatch.get_region(record),
+        'region': cloudwatch.get_region(record),
         'Tags': {},
         'configuration': {}
     }
@@ -159,7 +159,7 @@ def process_update_records(update_records):
                 "accountId": account_id,
                 "eventTime": item["eventDetails"]["detail"]["eventTime"],
                 "BucketName": b,
-                "Region": bucket_details["Region"],
+                "region": bucket_details["Region"],
                 # Duplicated in top level and configuration for secondary index
                 "Tags": bucket_details["Tags"] or {}
             }
@@ -168,7 +168,6 @@ def process_update_records(update_records):
             del bucket_details["Arn"]
             del bucket_details["GrantReferences"]
             del bucket_details["Region"]
-            del bucket_details["Owner"]
 
             if not bucket_details.get("CreationDate"):
                 bucket_details["CreationDate"] = item["creationDate"]
