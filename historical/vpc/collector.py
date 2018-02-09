@@ -165,7 +165,8 @@ def capture_update_records(records):
             'State': vpc.get('State'),
             'IsDefault': vpc.get('IsDefault'),
             'CidrBlock': vpc.get('CidrBlock'),
-            'Name': get_vpc_name(vpc)
+            'Name': get_vpc_name(vpc),
+            'Region': cloudwatch.get_region(record)
         })
 
         log.debug('Writing Dynamodb Record. Records: {record}'.format(record=data))

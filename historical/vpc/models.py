@@ -28,6 +28,7 @@ class VPCModel(object):
     Tags = ListAttribute()
     IsDefault = BooleanAttribute()
     Name = UnicodeAttribute(null=True)
+    Region = UnicodeAttribute()
 
 
 class DurableVPCModel(Model, DurableHistoricalModel, AWSHistoricalMixin, VPCModel):

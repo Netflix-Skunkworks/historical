@@ -30,6 +30,7 @@ VPC = {
     'State': 'available',
     'Name': 'vpc0',
     'Tags': [{'Key': 'name', 'Value': 'vpc0'}],
+    'Region': 'us-east-1',
     'configuration': {
             'CidrBlock': 'string',
             'DhcpOptionsId': 'string',
