@@ -41,7 +41,6 @@ class CurrentHistoricalModel(object):
 
 class AWSHistoricalMixin(object):
     arn = UnicodeAttribute(hash_key=True)
-    region = UnicodeAttribute(default=CURRENT_REGION)
     accountId = UnicodeAttribute()
     userIdentity = MapAttribute(null=True)
     principalId = UnicodeAttribute(null=True)

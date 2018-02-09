@@ -5,14 +5,10 @@ Historical
 Allows for the tracking of AWS configuration data across accounts/regions/technologies.
 
 """
-import sys
 import os.path
+import sys
 
-import subprocess
-from distutils import log
 from setuptools import setup, find_packages
-from setuptools.command.install import install
-
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__)))
 

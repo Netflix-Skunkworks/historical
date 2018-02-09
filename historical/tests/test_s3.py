@@ -45,7 +45,7 @@ S3_BUCKET = {
     "accountId": "123456789012",
     "eventTime": "2017-09-08T00:34:34Z",
     "BucketName": "testbucket1",
-    "region": "us-east-1",
+    "Region": "us-east-1",
     "Tags": {},
     "configuration": {
         "Grants": {

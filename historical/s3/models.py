@@ -17,17 +17,20 @@ from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AW
 
 class S3Model(object):
     BucketName = UnicodeAttribute()
+    Region = UnicodeAttribute()
     Tags = MapAttribute()
 
 
 class DurableS3Model(Model, DurableHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3DurableTable'
+        region = CURRENT_REGION
 
 
 class CurrentS3Model(Model, CurrentHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3CurrentTable'
+        region = CURRENT_REGION
 
 
 class ViewIndex(GlobalSecondaryIndex):
