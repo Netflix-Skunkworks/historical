@@ -140,14 +140,21 @@ def process_update_records(update_records):
                                             assume_role=HISTORICAL_ROLE,
                                             region=CURRENT_REGION)
                 if bucket_details.get("Error"):
-                    log.error("Unable to fetch details about bucket: {}. "
+                    log.error("[X] Unable to fetch details about bucket: {}. "
                               "The error details are: {}".format(b, bucket_details["Error"]))
                     continue
 
             except ClientError as ce:
                 if ce.response["Error"]["Code"] == "NoSuchBucket":
-                    log.warning("Received update request for bucket: {} that does not "
+                    log.warning("[?] Received update request for bucket: {} that does not "
                                 "currently exist. Skipping.".format(b))
+                    continue
+
+                # Catch Access Denied exceptions as well:
+                if ce.response["Error"]["Code"] == "AccessDenied":
+                    log.error("[X] Unable to fetch details for S3 Bucket: {} in {}. Access is Denied. Skipping...".format(
+                        b, account_id
+                    ))
                     continue
                 raise Exception(ce)
 
