@@ -1,0 +1,13 @@
+{
+  "technology_name": "ELB",
+  "technology_slug": "{{cookiecutter.technology_name.lower().replace(' ', '_').replace('-', '_')}}",
+  "email": "kevin@example.com",
+  "author": "Kevin Glisson",
+  "team": "Team Rocket",
+  "version": "0.1.0",
+  "test_account_name": "test",
+  "test_account_id": "",
+  "prod_account_name": "prod",
+  "prod_account_id": "",
+  "_extensions": ["historical.common.extensions.HistoricalExtension"]
+}

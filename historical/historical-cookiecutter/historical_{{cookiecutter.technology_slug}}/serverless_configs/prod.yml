@@ -1,0 +1,8 @@
+accountId: {{cookiecutter.prod_account_id}}
+accountName: {{cookiecutter.prod_account_name}}
+pythonRequirements:
+    dockerizePip: true
+    invalidateCaches: true
+prune:
+  automatic: true
+  number: 3

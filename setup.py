@@ -22,14 +22,16 @@ with open(os.path.join(ROOT, "historical", "__about__.py")) as f:
 
 
 install_requires = [
-    'cloudaux==1.4.7',
+    'cloudaux>=1.4.7',
     'boto3>=1.4.4',
     'click>=6.7',
+    'click-log>=0.2.1',
     'pynamodb>=3.1.0',
     'deepdiff>=3.3.0',
-    'raven-python-lambda',
+    'raven-python-lambda>=0.1.7',
     'marshmallow>=2.13.5',
     'swag-client>=0.3.0',
+    'python-dateutil==2.6.1'
 ]
 
 tests_require = [

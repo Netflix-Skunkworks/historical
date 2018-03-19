@@ -1,0 +1,253 @@
+service: "historical-{{cookiecutter.technology_slug}}"
+
+provider:
+  name: aws
+  runtime: python3.6
+  memorySize: 1024
+  timeout: 300
+  deploymentBucket:
+    name: ${opt:region}-${self:custom.accountName}-{{cookiecutter.team}}
+
+custom: ${file(serverless_configs/${opt:stage}.yml)}
+
+functions:
+  Collector:
+    handler: historical.security_group.collector.handler
+    description: Processes polling and cloudwatch events.
+    tags:
+      owner: {{cookiecutter.email}}
+    role: arn:aws:iam::${self:custom.accountId}:role/HistoricalLambdaProfile
+    events:
+       - stream:
+           type: kinesis
+           arn:
+             Fn::GetAtt:
+               - Historical{{cookiecutter.technology_slug | titlecase}}Stream
+               - Arn
+           batchSize: 100
+           startingPosition: LATEST
+
+       - stream:
+           type: kinesis
+           arn:
+             Fn::GetAtt:
+               - Historical{{cookiecutter.technology_slug | titlecase}}PollerStream
+               - Arn
+           batchSize: 100
+           startingPosition: LATEST
+    environment:
+      SENTRY_DSN: ${self:custom.sentryDSN}
+
+  Poller:
+    handler: historical.{{cookiecutter.technology_slug}}.poller.handler
+    description: Scheduled event that describes {{cookiecutter.technology_name}}.
+    tags:
+      owner: {{cookiecutter.email}}
+    role: arn:aws:iam::${self:custom.accountId}:role/HistoricalLambdaProfile
+
+  Differ:
+    handler: historical.{{cookiecutter.technology_slug}}.differ.handler
+    description: Stream based function that is resposible for finding differences.
+    tags:
+      owner: {{cookiecutter.email}}
+    role: arn:aws:iam::${self:custom.accountId}:role/HistoricalLambdaProfile
+    events:
+      - stream:
+         type: dynamodb
+         arn:
+           Fn::GetAtt:
+             - Historical{{cookiecutter.technology_slug | titlecase}}CurrentTable
+             - StreamArn
+resources:
+  Resources:
+    # The Kinesis Stream -- Where the events will go:
+    Historical{{cookiecutter.technology_slug | titlecase}}Stream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}Stream
+        ShardCount: 1
+
+    # The Kinesis Polling Stream -- Where the polling events will go:
+    Historical{{cookiecutter.technology_slug | titlecase}}PollerStream:
+      Type: AWS::Kinesis::Stream
+      Properties:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}PollerStream
+        ShardCount: 1
+
+    # The events -- these will be placed on the Kinesis stream:
+    CloudWatchEventRule:
+      Type: AWS::Events::Rule
+      DependsOn:
+        - Historical{{cookiecutter.technology_slug | titlecase}}Stream
+      Properties:
+        Description: EventRule forwarding security group changes.
+        EventPattern:
+          source:
+            - aws.ec2
+          detail-type:
+            - AWS API Call via CloudTrail
+          detail:
+            eventSource:
+              - ec2.amazonaws.com
+            eventName:
+              # TODO Update with your events
+        State: ENABLED
+        Targets:
+          -
+            Arn:
+              Fn::GetAtt:
+                - Historical{{cookiecutter.technology_slug | titlecase}}Stream
+                - Arn
+            Id: EventStream
+            RoleArn: arn:aws:iam::${self:custom.accountId}:role/service-role/AwsEventsInvokeKinesis
+
+    # The "Current" DynamoDB table:
+    Historical{{cookiecutter.technology_slug | titlecase}}CurrentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Historical{{cookiecutter.technology_slug | titlecase}}CurrentTable
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        AttributeDefinitions:
+          - AttributeName: arn
+            AttributeType: S
+        KeySchema:
+          - AttributeName: arn
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 100
+          WriteCapacityUnits: 100
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    # The Durable (Historical) change DynamoDB table:
+    Historical{{cookiecutter.technology_slug | titlecase}}DurableTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Historical{{cookiecutter.technology_slug | titlecase}}DurableTable
+        AttributeDefinitions:
+          - AttributeName: arn
+            AttributeType: S
+          - AttributeName: eventTime
+            AttributeType: S
+        KeySchema:
+          - AttributeName: arn
+            KeyType: HASH
+          - AttributeName: eventTime
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 100
+          WriteCapacityUnits: 100
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+    # Lambdas
+    CollectorLambdaFunction:
+      Type: AWS::Lambda::Function
+      DependsOn:
+        - Historical{{cookiecutter.technology_slug | titlecase}}Stream
+
+    DifferLambdaFunction:
+      Type: AWS::Lambda::Function
+      DependsOn:
+        - Historical{{cookiecutter.technology_slug | titlecase}}CurrentTable
+
+    PollerScheduledRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Description: ScheduledRule
+        ScheduleExpression: rate(60 minutes)
+        State: ENABLED
+        Targets:
+          -
+            Arn:
+              Fn::GetAtt:
+                - PollerLambdaFunction
+                - Arn
+            Id: TargetFunctionV1
+
+    PermissionForEventsToInvokeLambda:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName:
+          Ref: PollerLambdaFunction
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        SourceArn:
+          Fn::GetAtt:
+            - PollerScheduledRule
+            - Arn
+
+    # Log group -- 1 for each function...
+    CollectorLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+    PollerLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+    DifferLogGroup:
+      Properties:
+        RetentionInDays: "3"
+
+  # Outputs -- for use in other dependent Historical deployments:
+  Outputs:
+    Historical{{cookiecutter.technology_slug | titlecase}}StreamArn:
+      Description: Historical Security Group Event Kinesis Stream ARN
+      Value:
+        Fn::GetAtt:
+          - Historical{{cookiecutter.technology_slug | titlecase}}Stream
+          - Arn
+      Export:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}StreamArn
+
+    Historical{{cookiecutter.technology_slug | titlecase}}PollerStreamArn:
+      Description: Historical Security Group Poller Kinesis Stream ARN
+      Value:
+        Fn::GetAtt:
+          - Historical{{cookiecutter.technology_slug | titlecase}}PollerStream
+          - Arn
+      Export:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}PollerStreamArn
+
+    Historical{{cookiecutter.technology_slug | titlecase}}CurrentTableArn:
+      Description: Historical Security Group Current DynamoDB Table ARN
+      Value:
+        Fn::GetAtt:
+          - Historical{{cookiecutter.technology_slug | titlecase}}CurrentTable
+          - Arn
+      Export:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}CurrentTableArn
+
+    Historical{{cookiecutter.technology_slug | titlecase}}CurrentTableStreamArn:
+      Description: Historical Security Group Current DynamoDB Table Stream ARN
+      Value:
+        Fn::GetAtt:
+          - Historical{{cookiecutter.technology_slug | titlecase}}CurrentTable
+          - StreamArn
+      Export:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}CurrentTableStreamArn
+
+    Historical{{cookiecutter.technology_slug | titlecase}}DurableTableArn:
+      Description: Historical Security Group Durable DynamoDB Table ARN
+      Value:
+        Fn::GetAtt:
+          - Historical{{cookiecutter.technology_slug | titlecase}}DurableTable
+          - Arn
+      Export:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}DurableTableArn
+
+    Historical{{cookiecutter.technology_slug | titlecase}}DurableTableStreamArn:
+      Description: Historical Security Group Durable DynamoDB Table Stream ARN
+      Value:
+        Fn::GetAtt:
+          - Historical{{cookiecutter.technology_slug | titlecase}}DurableTable
+          - StreamArn
+      Export:
+        Name: Historical{{cookiecutter.technology_slug | titlecase}}DurableTableStreamArn
+
+plugins:
+  - serverless-python-requirements
+  - serverless-prune-plugin
