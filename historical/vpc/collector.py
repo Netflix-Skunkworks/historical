@@ -75,14 +75,14 @@ def describe_vpc(record):
                         'Values': [vpc_id]
                     }
                 ]
-            )['Vpcs']
+            )
         elif vpc_id:
             return describe_vpcs(
                 account_number=account_id,
                 assume_role=HISTORICAL_ROLE,
                 region=CURRENT_REGION,
                 VpcIds=[vpc_id]
-            )['Vpcs']
+            )
         else:
             raise Exception('Describe requires VpcId.')
     except ClientError as e:
@@ -122,13 +122,13 @@ def capture_delete_records(records):
         model = create_delete_model(r)
         if model:
             try:
-                model.delete(eventTime__le=r['detail']['eventTime'])
-            except DeleteError as e:
-                log.warning('Unable to delete vpc. Vpc does not exist. Record: {record}'.format(
+                model.delete(condition=(CurrentVPCModel.eventTime <= r['detail']['eventTime']))
+            except DeleteError as _:
+                log.warning('Unable to delete VPC. VPC does not exist. Record: {record}'.format(
                     record=r
                 ))
         else:
-            log.warning('Unable to delete Vpc. Vpc does not exist. Record: {record}'.format(
+            log.warning('Unable to delete VPC. VPC does not exist. Record: {record}'.format(
                 record=r
             ))
 
