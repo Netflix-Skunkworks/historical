@@ -138,12 +138,9 @@ def buckets(s3):
             'Rules': [
                 {
                     'Expiration': {
-                        'Date': datetime(2015, 1, 1),
-                        'Days': 123,
-                        'ExpiredObjectDeleteMarker': True | False
+                        'Days': 5
                     },
                     'ID': 'string',
-                    'Prefix': 'string',
                     'Filter': {
                         'Prefix': 'string',
                         'Tag': {
@@ -161,13 +158,6 @@ def buckets(s3):
                         }
                     },
                     'Status': 'Enabled',
-                    'Transitions': [
-                        {
-                            'Date': datetime(2015, 1, 1),
-                            'Days': 123,
-                            'StorageClass': 'GLACIER'
-                        },
-                    ],
                     'NoncurrentVersionTransitions': [
                         {
                             'NoncurrentDays': 123,
@@ -176,9 +166,6 @@ def buckets(s3):
                     ],
                     'NoncurrentVersionExpiration': {
                         'NoncurrentDays': 123
-                    },
-                    'AbortIncompleteMultipartUpload': {
-                        'DaysAfterInitiation': 123
                     }
                 }
             ]

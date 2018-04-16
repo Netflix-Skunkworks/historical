@@ -102,7 +102,7 @@ def test_durable_table(durable_vpc_table):
 
 def test_poller(historical_kinesis, historical_role, mock_lambda_environment, vpcs, swag_accounts):
     from historical.vpc.poller import handler
-    handler(None, None)
+    handler({}, None)
 
     shard_id = historical_kinesis.describe_stream(
         StreamName='historicalstream')['StreamDescription']['Shards'][0]['ShardId']

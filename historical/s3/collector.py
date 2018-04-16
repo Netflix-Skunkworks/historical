@@ -100,7 +100,7 @@ def process_delete_records(delete_records):
         try:
             print("Deleting bucket: {}".format(arn))
             model = create_delete_model(r)
-            model.save(eventTime__le=r["detail"]["eventTime"])
+            model.save(condition=(CurrentS3Model.eventTime <= r["detail"]["eventTime"]))
             model.delete()
 
         except PynamoDBConnectionError as pdce:

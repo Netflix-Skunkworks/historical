@@ -137,8 +137,8 @@ def capture_delete_records(records):
         model = create_delete_model(r)
         if model:
             try:
-                model.delete(eventTime__le=r['detail']['eventTime'])
-            except DeleteError as e:
+                model.delete(condition=(CurrentSecurityGroupModel.eventTime <= r['detail']['eventTime']))
+            except DeleteError as _:
                 log.warning('Unable to delete security group. Security group does not exist. Record: {record}'.format(
                     record=r
                 ))

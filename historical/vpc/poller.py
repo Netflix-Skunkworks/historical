@@ -26,7 +26,7 @@ log.setLevel(logging.INFO)
 @RavenLambdaWrapper()
 def handler(event, context):
     """
-    Historical security group event poller.
+    Historical VPC event poller.
 
     This poller is run at a set interval in order to ensure that changes do not go undetected by historical.
 
@@ -42,7 +42,8 @@ def handler(event, context):
                 assume_role=HISTORICAL_ROLE,
                 region=CURRENT_REGION
             )
-            events = [vpc_polling_schema.serialize(account['id'], v) for v in vpcs['Vpcs']]
+
+            events = [vpc_polling_schema.serialize(account['id'], v) for v in vpcs]
             produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalVPCPollerStream'))
             log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))
         except ClientError as e:
@@ -50,4 +51,3 @@ def handler(event, context):
                 account_id=account['id'],
                 reason=e
             ))
-
