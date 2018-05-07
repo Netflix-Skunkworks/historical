@@ -9,7 +9,7 @@ import logging
 
 from raven_python_lambda import RavenLambdaWrapper
 
-from historical.common.dynamodb import process_dynamodb_record
+from historical.common.dynamodb import process_dynamodb_differ_record
 from historical.security_group.models import DurableSecurityGroupModel
 
 logging.basicConfig()
@@ -26,4 +26,4 @@ def handler(event, context):
     historical record.
     """
     for record in event['Records']:
-        process_dynamodb_record(record, DurableSecurityGroupModel)
+        process_dynamodb_differ_record(record, DurableSecurityGroupModel)

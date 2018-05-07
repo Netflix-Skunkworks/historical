@@ -25,6 +25,7 @@ VPC = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343',
     'VpcId': 'vpc-123343',
     'accountId': '123456789012',
+    'eventSource': 'aws.ec2',
     'IsDefault': True,
     'CidrBlock': 'string',
     'State': 'available',
@@ -84,16 +85,18 @@ def test_durable_table(durable_vpc_table):
     from historical.vpc.models import DurableVPCModel
 
     # we are explicit about our eventTimes because as RANGE_KEY it will need to be unique.
-    VPC['eventTime'] = datetime(2017, 5, 11, 23, 30)
-    DurableVPCModel(**VPC).save()
+    v = VPC.copy()
+    v.pop("eventSource")
+    v['eventTime'] = datetime(2017, 5, 11, 23, 30)
+    DurableVPCModel(**v).save()
 
     items = list(DurableVPCModel.query('arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343'))
 
     assert len(items) == 1
     assert not getattr(items[0], 'ttl', None)
 
-    VPC['eventTime'] = datetime(2017, 5, 12, 23, 30)
-    DurableVPCModel(**VPC).save()
+    v['eventTime'] = datetime(2017, 5, 12, 23, 30)
+    DurableVPCModel(**v).save()
 
     items = list(DurableVPCModel.query('arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343'))
 
@@ -120,6 +123,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
 
     ttl = int(time.time() + TTL_EXPIRY)
     new_vpc = VPC.copy()
+    new_vpc.pop("eventSource")
     new_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     new_vpc['ttl'] = ttl
     data = DynamoDBRecordsFactory(
@@ -136,11 +140,20 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
         ]
     )
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
 
+    # First, test that nothing happens if the differ event region is different (global table complexity):
+    import historical.common.dynamodb
+    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
+    handler(data, None)
+    assert not DurableVPCModel.count()
+
+    # Back to the original region...
+    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
+    handler(data, None)
     assert DurableVPCModel.count() == 1
 
     duplicate_vpc = VPC.copy()
+    duplicate_vpc.pop("eventSource")
     duplicate_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     duplicate_vpc['ttl'] = ttl
     # ensure no new record for the same data
@@ -162,6 +175,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     assert DurableVPCModel.count() == 1
 
     updated_vpc = VPC.copy()
+    updated_vpc.pop("eventSource")
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['State'] = 'changeme'
     updated_vpc['ttl'] = ttl
@@ -183,6 +197,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     assert DurableVPCModel.count() == 2
 
     updated_vpc = VPC.copy()
+    updated_vpc.pop("eventSource")
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['CidrBlock'] = 'changeme'
     updated_vpc['ttl'] = ttl
@@ -204,6 +219,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     assert DurableVPCModel.count() == 3
 
     updated_vpc = VPC.copy()
+    updated_vpc.pop("eventSource")
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=31, second=0).isoformat() + 'Z'
     updated_vpc.update({'Name': 'blah'})
     updated_vpc['ttl'] = ttl
@@ -225,6 +241,7 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     assert DurableVPCModel.count() == 4
 
     deleted_vpc = VPC.copy()
+    deleted_vpc.pop("eventSource")
     deleted_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
     deleted_vpc['ttl'] = ttl
 
@@ -247,6 +264,14 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
         ]
     )
     data = json.loads(json.dumps(data, default=serialize))
+
+    # First, test that nothing happens if the differ event region is different (global table complexity):
+    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
+    handler(data, None)
+    assert DurableVPCModel.count() == 4
+
+    # Back to the original region...
+    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableVPCModel.count() == 5
 

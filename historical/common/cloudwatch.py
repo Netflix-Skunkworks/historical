@@ -67,5 +67,8 @@ def get_historical_base_info(event):
     if event['detail'].get('eventTime'):
         data['eventTime'] = event['detail']['eventTime']
 
+    if event['detail'].get("source"):
+        data['eventSource'] = event['detail']['source']
+
     return data
 
