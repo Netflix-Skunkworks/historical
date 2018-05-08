@@ -81,7 +81,7 @@ def create_delete_model(record):
         'Region': cloudwatch.get_region(record),
         'Tags': {},
         'configuration': {},
-        'eventSource': record["detail"]["source"]
+        'eventSource': record["detail"]["eventSource"]
     }
 
     return CurrentS3Model(**data)
@@ -170,7 +170,7 @@ def process_update_records(update_records):
                 "Region": bucket_details["Region"],
                 # Duplicated in top level and configuration for secondary index
                 "Tags": bucket_details["Tags"] or {},
-                "eventSource": item["eventDetails"]["detail"]["source"]
+                "eventSource": item["eventDetails"]["detail"]["eventSource"]
             }
 
             # Remove the fields we don't care about:
