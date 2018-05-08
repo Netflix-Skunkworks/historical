@@ -204,7 +204,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
             requestParameters={
                 "bucketName": "testbucket1"
             },
-            source="aws.s3",
+            eventSource="aws.s3",
             eventName="CreateBucket",
             eventTime=now
         )
@@ -235,7 +235,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
                 "bucketName": "testbucket1",
                 "creationDate": now
             },
-            source="historical.s3.poller",
+            eventSource="historical.s3.poller",
             eventName="DescribeBucket",
             eventTime=now
         )
@@ -264,7 +264,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
             requestParameters={
                 "bucketName": "testbucket1"
             },
-            source="aws.s3",
+            eventSource="aws.s3",
             eventName="DeleteBucket",
             eventTime=now
         )
@@ -293,7 +293,7 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_envir
             requestParameters={
                 "bucketName": "not-a-bucket"
             },
-            source="aws.s3",
+            eventSource="aws.s3",
             eventName="PutBucketPolicy",
         )
     )
