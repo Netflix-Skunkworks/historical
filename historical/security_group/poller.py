@@ -13,7 +13,7 @@ from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
 
-from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
+from historical.constants import POLL_REGIONS, HISTORICAL_ROLE
 from historical.security_group.models import security_group_polling_schema
 from historical.common.accounts import get_historical_accounts
 from historical.common.kinesis import produce_events
@@ -36,18 +36,17 @@ def handler(event, context):
     log.debug('Running poller. Configuration: {}'.format(event))
 
     for account in get_historical_accounts():
-        try:
-            groups = describe_security_groups(
-                account_number=account['id'],
-                assume_role=HISTORICAL_ROLE,
-                region=CURRENT_REGION
-            )
-            events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
-            produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupPollerStream'))
-            log.debug('Finished generating polling events. Account: {} Events Created: {}'.format(account['id'], len(events)))
-        except ClientError as e:
-            log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
-                account_id=account['id'],
-                reason=e
-            ))
-
+        for region in POLL_REGIONS:
+            try:
+                groups = describe_security_groups(
+                    account_number=account['id'],
+                    assume_role=HISTORICAL_ROLE,
+                    region=region
+                )
+                events = [security_group_polling_schema.serialize(account['id'], g) for g in groups['SecurityGroups']]
+                produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalSecurityGroupPollerStream'))
+                log.debug('Finished generating polling events. Account: {}/{} '
+                          'Events Created: {}'.format(account['id'], region, len(events)))
+            except ClientError as e:
+                log.warning('Unable to generate events for account/region. Account Id/Region: {account_id}/{region}'
+                            ' Reason: {reason}'.format(account_id=account['id'], region=region, reason=e))

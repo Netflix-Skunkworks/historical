@@ -37,6 +37,7 @@ class DurableHistoricalModel(object):
 class CurrentHistoricalModel(object):
     eventTime = EventTimeAttribute(default=default_event_time)
     ttl = NumberAttribute(default=default_ttl())
+    eventSource = UnicodeAttribute()
 
 
 class AWSHistoricalMixin(object):

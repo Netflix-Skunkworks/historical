@@ -4,6 +4,8 @@ import logging
 from deepdiff import DeepDiff
 from boto3.dynamodb.types import TypeDeserializer
 
+from historical.constants import DIFF_REGIONS
+
 deser = TypeDeserializer()
 
 
@@ -23,6 +25,7 @@ def default_diff(latest_config, current_config):
 def remove_current_specific_fields(obj):
     """Remove all fields that belong to the Current table -- that don't belong in the Durable table"""
     obj.pop("ttl", None)
+    obj.pop("eventSource", None)
     return obj
 
 
@@ -56,11 +59,15 @@ def modify_record(durable_model, current_revision, arn, event_time, diff_func):
         log.error('Got modify event but no current revision found. Arn: {arn}'.format(arn=arn))
 
 
-def delete_record(old_image, durable_model):
-    """Handles a DynamoDB DELETE event type."""
+def delete_differ_record(old_image, durable_model, region_attr):
+    """Handles a DynamoDB DELETE event type -- For the Differ."""
     data = {}
     for item in old_image:
         data[item] = deser.deserialize(old_image[item])
+
+    if data.get(region_attr) not in DIFF_REGIONS:
+        log.debug("Not processing record -- record event took place in: {}".format(data.get(region_attr)))
+        return
 
     data['configuration'] = {}
 
@@ -89,14 +96,25 @@ def deserialize_current_dynamo_to_pynamo(record, model):
     return model(**data)
 
 
-def process_dynamodb_record(record, durable_model, diff_func=None):
-    """Processes a group of DynamoDB NewImage records."""
+def process_dynamodb_differ_record(record, durable_model, diff_func=None, region_attr="Region"):
+    """
+    Processes a group of DynamoDB NewImage records (for Differ events).
+
+    This will ONLY process the record if the record exists in one of the regions defined in the
+    DIFF_REGIONS environment variable.
+    """
     diff_func = diff_func or default_diff
 
     arn = record['dynamodb']['Keys']['arn']['S']
 
     if record['eventName'] in ['INSERT', 'MODIFY']:
         current_revision = deserialize_current_dynamo_to_pynamo(record, durable_model)
+
+        # Is this in the region that we care about?
+        if getattr(current_revision, region_attr) not in DIFF_REGIONS:
+            log.debug("Not processing record -- record event took place in: {}".format(
+                getattr(current_revision, region_attr)))
+            return
 
         if record['eventName'] == 'INSERT':
             current_revision.save()
@@ -117,4 +135,4 @@ def process_dynamodb_record(record, durable_model, diff_func=None):
             if record['userIdentity']['type'] == 'Service':
                 if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
                     old_image = remove_current_specific_fields(record['dynamodb']['OldImage'])
-                    delete_record(old_image, durable_model)
+                    delete_differ_record(old_image, durable_model, region_attr)

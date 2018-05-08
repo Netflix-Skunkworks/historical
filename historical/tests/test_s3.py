@@ -44,6 +44,7 @@ S3_BUCKET = {
     },
     "accountId": "123456789012",
     "eventTime": "2017-09-08T00:34:34Z",
+    "eventSource": "aws.s3",
     "BucketName": "testbucket1",
     "Region": "us-east-1",
     "Tags": {},
@@ -140,6 +141,7 @@ def test_durable_table(durable_s3_table):
 
     # We are explicit about our eventTimes because as RANGE_KEY it will need to be unique.
     S3_BUCKET['eventTime'] = datetime(2017, 5, 11, 23, 30)
+    S3_BUCKET.pop("eventSource")
     DurableS3Model(**S3_BUCKET).save()
     items = list(DurableS3Model.query('arn:aws:s3:::testbucket1'))
     assert len(items) == 1
@@ -173,6 +175,7 @@ def test_poller(historical_role, buckets, mock_lambda_environment, historical_ki
 
         assert all_buckets[data["detail"]["request_parameters"]["bucket_name"]]
         assert datetime.strptime(data["detail"]["request_parameters"]["creation_date"], '%Y-%m-%dT%H:%M:%SZ')
+        assert data["detail"]["event_source"] == "historical.s3.poller"
 
         # Remove from the dict (at the end, there should be 0 items left)
         del all_buckets[data["detail"]["request_parameters"]["bucket_name"]]
@@ -223,6 +226,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
     assert result[0].Tags.attribute_values["theBucketName"] == \
            result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
+    assert result[0].eventSource == "aws.s3"
 
     # Polling (make sure the date is included):
     polling_event = CloudwatchEventFactory(
@@ -231,7 +235,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
                 "bucketName": "testbucket1",
                 "creationDate": now
             },
-            source="aws.s3",
+            source="historical.s3.poller",
             eventName="DescribeBucket",
             eventTime=now
         )
@@ -252,6 +256,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     # Load the config and verify the polling timestamp is in there:
     result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
     assert result[0].configuration["CreationDate"] == now.isoformat() + "Z"
+    assert result[0].eventSource == "historical.s3.poller"
 
     # And deletion:
     delete_event = CloudwatchEventFactory(
@@ -329,6 +334,15 @@ def test_differ(durable_s3_table, mock_lambda_environment):
         ]
     )
     data = json.loads(json.dumps(new_item, default=serialize))
+
+    # First, test that nothing happens if the differ event region is different (global table complexity):
+    import historical.common.dynamodb
+    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
+    handler(data, None)
+    assert not DurableS3Model.count()
+
+    # Back to the original region...
+    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableS3Model.count() == 1
 
@@ -410,5 +424,13 @@ def test_differ(durable_s3_table, mock_lambda_environment):
         ]
     )
     data = json.loads(json.dumps(data, default=serialize))
+
+    # First, test that nothing happens if the differ event region is different (global table complexity):
+    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
+    handler(data, None)
+    assert DurableS3Model.count() == 2
+
+    # Back to the original region...
+    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableS3Model.count() == 3

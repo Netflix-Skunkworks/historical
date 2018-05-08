@@ -25,6 +25,7 @@ SECURITY_GROUP = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568',
     'GroupId': 'sg-1234568',
     'GroupName': 'testGroup',
+    'eventSource': 'aws.ec2',
     'VpcId': 'vpc-123343',
     'accountId': '123456789012',
     'OwnerId': '123456789012',
@@ -127,16 +128,18 @@ def test_durable_table(durable_security_group_table):
     from historical.security_group.models import DurableSecurityGroupModel
 
     # we are explicit about our eventTimes because as RANGE_KEY it will need to be unique.
-    SECURITY_GROUP['eventTime'] = datetime(2017, 5, 11, 23, 30)
-    DurableSecurityGroupModel(**SECURITY_GROUP).save()
+    sg = SECURITY_GROUP.copy()
+    sg['eventTime'] = datetime(2017, 5, 11, 23, 30)
+    sg.pop("eventSource")
+    DurableSecurityGroupModel(**sg).save()
 
     items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
     assert len(items) == 1
     assert not getattr(items[0], "ttl", None)
 
-    SECURITY_GROUP['eventTime'] = datetime(2017, 5, 12, 23, 30)
-    DurableSecurityGroupModel(**SECURITY_GROUP).save()
+    sg['eventTime'] = datetime(2017, 5, 12, 23, 30)
+    DurableSecurityGroupModel(**sg).save()
 
     items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
@@ -163,6 +166,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
 
     ttl = int(time.time() + TTL_EXPIRY)
     new_group = SECURITY_GROUP.copy()
+    new_group.pop("eventSource")
     new_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     new_group["ttl"] = ttl
     data = DynamoDBRecordsFactory(
@@ -179,11 +183,20 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
         ]
     )
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
 
+    # First, test that nothing happens if the differ event region is different (global table complexity):
+    import historical.common.dynamodb
+    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
+    handler(data, None)
+    assert not DurableSecurityGroupModel.count()
+
+    # Back to the original region...
+    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
+    handler(data, None)
     assert DurableSecurityGroupModel.count() == 1
 
     duplicate_group = SECURITY_GROUP.copy()
+    duplicate_group.pop("eventSource")
     duplicate_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     duplicate_group["ttl"] = ttl
     # ensure no new record for the same data
@@ -205,6 +218,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     assert DurableSecurityGroupModel.count() == 1
 
     updated_group = SECURITY_GROUP.copy()
+    updated_group.pop("eventSource")
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_group['configuration']['Description'] = 'changeme'
     updated_group["ttl"] = ttl
@@ -226,6 +240,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     assert DurableSecurityGroupModel.count() == 2
 
     updated_group = SECURITY_GROUP.copy()
+    updated_group.pop("eventSource")
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_group['configuration']['IpPermissions'][0]['IpRanges'][0]['CidrIp'] = 'changeme'
     updated_group["ttl"] = ttl
@@ -247,6 +262,7 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     assert DurableSecurityGroupModel.count() == 3
 
     deleted_group = SECURITY_GROUP.copy()
+    deleted_group.pop("eventSource")
     deleted_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
     deleted_group["ttl"] = ttl
 
@@ -269,6 +285,14 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
         ]
     )
     data = json.loads(json.dumps(data, default=serialize))
+
+    # First, test that nothing happens if the differ event region is different (global table complexity):
+    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
+    handler(data, None)
+    assert DurableSecurityGroupModel.count() == 3
+
+    # Back to the original region...
+    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 4
 
