@@ -55,6 +55,10 @@ def group_records_by_type(records):
     """Break records into two lists; create/update events and delete events."""
     update_records, delete_records = [], []
     for r in records:
+        if r.get("detail-type", "") == "Scheduled Event":
+            log.error("[X] Received a Scheduled Event in the stream... Please check that your environment is set up"
+                      " correctly.")
+            continue
 
         # Do not capture error events:
         if not r["detail"].get("errorCode"):
