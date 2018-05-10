@@ -57,6 +57,11 @@ def group_records_by_type(records):
         if isinstance(r, str):
             break
 
+        if r.get("detail-type", "") == "Scheduled Event":
+            log.error("[X] Received a Scheduled Event in the stream... Please check that your environment is set up"
+                      " correctly.")
+            continue
+
         if r['detail']['eventName'] in UPDATE_EVENTS:
             update_records.append(r)
         else:
