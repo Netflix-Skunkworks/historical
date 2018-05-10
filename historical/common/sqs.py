@@ -5,11 +5,16 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Mike Grima <mgrima@netflix.com>
 """
+import logging
 import uuid
 
 import boto3
 
 from historical.constants import CURRENT_REGION
+
+logging.basicConfig()
+log = logging.getLogger('historical')
+log.setLevel(logging.INFO)
 
 
 def chunks(event_list, chunk_size):
@@ -46,3 +51,26 @@ def produce_events(events, queue_url):
         records = [make_sqs_record(event) for event in chunk]
 
         client.send_message_batch(Entries=records, QueueUrl=queue_url)
+
+
+def group_records_by_type(records, update_events):
+    """Break records into two lists; create/update events and delete events."""
+    update_records, delete_records = [], []
+    for r in records:
+        if r.get("detail-type", "") == "Scheduled Event":
+            log.error("[X] Received a Scheduled Event in the Queue... Please check that your environment is set up"
+                      " correctly.")
+            continue
+
+        # Ignore SQS junk messages (like subscription notices and things):
+        if not r.get("detail"):
+            continue
+
+        # Do not capture error events:
+        if not r["detail"].get("errorCode"):
+            if r['detail']['eventName'] in update_events:
+                update_records.append(r)
+            else:
+                delete_records.append(r)
+
+    return update_records, delete_records

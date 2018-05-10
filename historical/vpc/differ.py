@@ -10,7 +10,7 @@ import logging
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.dynamodb import process_dynamodb_differ_record
-from historical.vpc.models import DurableVPCModel
+from historical.vpc.models import DurableVPCModel, CurrentVPCModel
 
 logging.basicConfig()
 log = logging.getLogger('historical')
@@ -26,4 +26,4 @@ def handler(event, context):
     historical record.
     """
     for record in event['Records']:
-        process_dynamodb_differ_record(record, DurableVPCModel)
+        process_dynamodb_differ_record(record, CurrentVPCModel, DurableVPCModel)

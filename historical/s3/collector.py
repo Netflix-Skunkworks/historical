@@ -13,6 +13,7 @@ from pynamodb.exceptions import PynamoDBConnectionError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 
+from historical.common.sqs import group_records_by_type
 from historical.constants import HISTORICAL_ROLE, CURRENT_REGION
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records
@@ -51,25 +52,6 @@ DELETE_EVENTS = [
 ]
 
 
-def group_records_by_type(records):
-    """Break records into two lists; create/update events and delete events."""
-    update_records, delete_records = [], []
-    for r in records:
-        if r.get("detail-type", "") == "Scheduled Event":
-            log.error("[X] Received a Scheduled Event in the Queue... Please check that your environment is set up"
-                      " correctly.")
-            continue
-
-        # Do not capture error events:
-        if not r["detail"].get("errorCode"):
-            if r['detail']['eventName'] in UPDATE_EVENTS:
-                update_records.append(r)
-            else:
-                delete_records.append(r)
-
-    return update_records, delete_records
-
-
 def create_delete_model(record):
     """Create an S3 model from a record."""
     arn = "arn:aws:s3:::{}".format(cloudwatch.filter_request_parameters('bucketName', record))
@@ -103,7 +85,7 @@ def process_delete_records(delete_records):
         # if the current event timestamp is newer and will only delete if the deletion
         # event is newer.
         try:
-            print("Deleting bucket: {}".format(arn))
+            log.debug("Deleting bucket: {}".format(arn))
             model = create_delete_model(r)
             model.save(condition=(CurrentS3Model.eventTime <= r["detail"]["eventTime"]))
             model.delete()
@@ -135,7 +117,7 @@ def process_update_records(update_records):
 
         # Query AWS for current configuration
         for b, item in buckets.items():
-            print("Processing Create/Update for: {}".format(b))
+            log.debug("Processing Create/Update for: {}".format(b))
             # If the bucket does not exist, then simply drop the request --
             # If this happens, there is likely a Delete event that has occurred and will be processed soon.
             try:
@@ -202,7 +184,7 @@ def handler(event, context):
 
     # Split records into two groups, update and delete.
     # We don't want to query for deleted records.
-    update_records, delete_records = group_records_by_type(records)
+    update_records, delete_records = group_records_by_type(records, UPDATE_EVENTS)
 
     log.debug("Processing update records...")
     process_update_records(update_records)

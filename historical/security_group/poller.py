@@ -35,7 +35,7 @@ def handler(event, context):
     """
     log.debug('Running poller. Configuration: {}'.format(event))
 
-    queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalSecurityGroupEvents'))
+    queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalSecurityGroupPoller'))
 
     for account in get_historical_accounts():
         for region in POLL_REGIONS:

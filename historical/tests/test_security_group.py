@@ -19,11 +19,9 @@ from historical.tests.factories import (
     RecordsFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
-    DynamoDBRecordsFactory,
     UserIdentityFactory,
     serialize,
-    SQSDataFactory)
-
+    SQSDataFactory, SnsDataFactory)
 
 SECURITY_GROUP = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568',
@@ -162,7 +160,7 @@ def test_poller(historical_sqs, historical_role, mock_lambda_environment, securi
     assert len(messages) == 3
 
 
-def test_differ(durable_security_group_table, mock_lambda_environment):
+def test_differ(current_security_group_table, durable_security_group_table, mock_lambda_environment):
     from historical.security_group.models import DurableSecurityGroupModel
     from historical.security_group.differ import handler
     from historical.models import TTL_EXPIRY
@@ -172,50 +170,29 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     new_group.pop("eventSource")
     new_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     new_group["ttl"] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=new_group,
-                    Keys={
-                        'arn': new_group['arn']
-                    }
-                ),
-                eventName='INSERT'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=new_group,
+        Keys={
+            'arn': new_group['arn']
+        }
+    ), eventName='INSERT'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-
-    # First, test that nothing happens if the differ event region is different (global table complexity):
-    import historical.common.dynamodb
-    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
-    handler(data, None)
-    assert not DurableSecurityGroupModel.count()
-
-    # Back to the original region...
-    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 1
 
+    # ensure no new record for the same data
     duplicate_group = SECURITY_GROUP.copy()
     duplicate_group.pop("eventSource")
     duplicate_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     duplicate_group["ttl"] = ttl
-    # ensure no new record for the same data
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=duplicate_group,
-                    Keys={
-                        'arn': duplicate_group['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=duplicate_group,
+        Keys={
+            'arn': duplicate_group['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 1
@@ -225,19 +202,13 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_group['configuration']['Description'] = 'changeme'
     updated_group["ttl"] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=updated_group,
-                    Keys={
-                        'arn': SECURITY_GROUP['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=updated_group,
+        Keys={
+            'arn': SECURITY_GROUP['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 2
@@ -247,19 +218,13 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_group['configuration']['IpPermissions'][0]['IpRanges'][0]['CidrIp'] = 'changeme'
     updated_group["ttl"] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=updated_group,
-                    Keys={
-                        'arn': SECURITY_GROUP['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=updated_group,
+        Keys={
+            'arn': SECURITY_GROUP['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 3
@@ -270,32 +235,18 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     deleted_group["ttl"] = ttl
 
     # ensure new record
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    OldImage=deleted_group,
-                    Keys={
-                        'arn': SECURITY_GROUP['arn']
-                    }
-                ),
-                eventName='REMOVE',
-                userIdentity=UserIdentityFactory(
-                    type='Service',
-                    principalId='dynamodb.amazonaws.com'
-                )
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        OldImage=deleted_group,
+        Keys={
+            'arn': SECURITY_GROUP['arn']
+        }),
+        eventName='REMOVE',
+        userIdentity=UserIdentityFactory(
+                type='Service',
+                principalId='dynamodb.amazonaws.com'
+        )), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-
-    # First, test that nothing happens if the differ event region is different (global table complexity):
-    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
-    handler(data, None)
-    assert DurableSecurityGroupModel.count() == 3
-
-    # Back to the original region...
-    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableSecurityGroupModel.count() == 4
 
