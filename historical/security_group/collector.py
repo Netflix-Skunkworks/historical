@@ -17,7 +17,7 @@ from cloudaux.aws.ec2 import describe_security_groups
 
 from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
 from historical.common import cloudwatch
-from historical.common.kinesis import deserialize_records
+from historical.common.util import deserialize_records
 from historical.security_group.models import CurrentSecurityGroupModel
 
 logging.basicConfig()

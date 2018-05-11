@@ -9,7 +9,7 @@ __title__ = "historical"
 __summary__ = ("Historical tracking of AWS configuration data.")
 __uri__ = "https://github.com/Netflix-Skunkworks/historical"
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 __author__ = "The Historical developers"
 __email__ = "security@netflix.com"

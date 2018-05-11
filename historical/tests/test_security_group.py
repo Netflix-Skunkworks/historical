@@ -13,7 +13,7 @@ from historical.tests.factories import (
     DetailFactory,
     KinesisDataFactory,
     KinesisRecordFactory,
-    KinesisRecordsFactory,
+    RecordsFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
     DynamoDBRecordsFactory,
@@ -307,7 +307,7 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
         ),
     )
     data = json.dumps(event, default=serialize)
-    data = KinesisRecordsFactory(
+    data = RecordsFactory(
         records=[
             KinesisRecordFactory(
                 kinesis=KinesisDataFactory(data=data))
@@ -327,7 +327,7 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
         ),
     )
     data = json.dumps(event, default=serialize)
-    data = KinesisRecordsFactory(
+    data = RecordsFactory(
         records=[
             KinesisRecordFactory(
                 kinesis=KinesisDataFactory(data=data))

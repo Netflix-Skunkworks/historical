@@ -15,7 +15,7 @@ from cloudaux.orchestration.aws.s3 import get_bucket
 
 from historical.constants import HISTORICAL_ROLE, CURRENT_REGION
 from historical.common import cloudwatch
-from historical.common.kinesis import deserialize_records
+from historical.common.util import deserialize_records
 from historical.s3.models import CurrentS3Model
 
 logging.basicConfig()
