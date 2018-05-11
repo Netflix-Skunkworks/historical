@@ -21,13 +21,13 @@ from historical.tests.factories import (
     DetailFactory,
     KinesisDataFactory,
     KinesisRecordFactory,
-    KinesisRecordsFactory,
+    RecordsFactory,
     serialize,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
     DynamoDBRecordsFactory,
-    UserIdentityFactory
-)
+    UserIdentityFactory,
+    SnsRecordFactory, SnsDataFactory)
 
 S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
@@ -210,7 +210,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
         )
     )
     data = json.dumps(create_event, default=serialize)
-    data = KinesisRecordsFactory(
+    data = RecordsFactory(
         records=[
             KinesisRecordFactory(
                 kinesis=KinesisDataFactory(data=data))
@@ -241,7 +241,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
         )
     )
     data = json.dumps(polling_event, default=serialize)
-    data = KinesisRecordsFactory(
+    data = RecordsFactory(
         records=[
             KinesisRecordFactory(
                 kinesis=KinesisDataFactory(data=data))
@@ -270,7 +270,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
         )
     )
     data = json.dumps(delete_event, default=serialize)
-    data = KinesisRecordsFactory(
+    data = RecordsFactory(
         records=[
             KinesisRecordFactory(
                 kinesis=KinesisDataFactory(data=data))
@@ -280,6 +280,40 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     data = json.loads(data)
     handler(data, None)
     assert CurrentS3Model.count() == 0
+
+
+def test_collector_sns(historical_role, buckets, mock_lambda_environment, swag_accounts, current_s3_table):
+    from historical.s3.collector import handler
+
+    now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
+    create_event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={
+                "bucketName": "testbucket1"
+            },
+            eventSource="aws.s3",
+            eventName="CreateBucket",
+            eventTime=now
+        )
+    )
+    data = json.dumps(create_event, default=serialize)
+    data = RecordsFactory(
+        records=[
+            SnsRecordFactory(
+                Sns=SnsDataFactory(Message=data))
+        ]
+    )
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, None)
+    result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
+    assert len(result) == 1
+    # Verify that the tags are duplicated in the top level and configuration:
+    assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
+    assert result[0].Tags.attribute_values["theBucketName"] == \
+           result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
+    assert result[0].eventSource == "aws.s3"
 
 
 def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_environment, swag_accounts,
@@ -298,7 +332,7 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_envir
         )
     )
     create_event_data = json.dumps(create_event, default=serialize)
-    data = KinesisRecordsFactory(
+    data = RecordsFactory(
         records=[
             KinesisRecordFactory(
                 kinesis=KinesisDataFactory(data=create_event_data))

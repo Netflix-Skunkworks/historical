@@ -1,3 +1,10 @@
+"""
+.. module: historical.common.accounts
+    :platform: Unix
+    :copyright: (c) 2018 by Netflix Inc., see AUTHORS for more
+    :license: Apache, see LICENSE for more details.
+.. author:: Kevin Glisson <kglisson@netflix.com>
+"""
 import os
 
 from swag_client.backend import SWAGManager

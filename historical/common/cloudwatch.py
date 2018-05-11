@@ -1,7 +1,7 @@
 """
 Helper functions for processing cloudwatch events.
 
-.. module: historical.cloudwatch
+.. module: historical.common.cloudwatch
     :platform: Unix
     :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.

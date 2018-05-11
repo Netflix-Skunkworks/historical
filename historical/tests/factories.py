@@ -95,8 +95,8 @@ class Records(object):
         self.Records = records
 
 
-class KinesisRecordsFactory(Factory):
-    """Factory for generating multiple Kinesis records."""
+class RecordsFactory(Factory):
+    """Factory for generating multiple Event (SNS, CloudWatch, Kinesis, DynamoDB) records."""
     class Meta:
         model = Records
 
@@ -230,3 +230,32 @@ class HistoricalPollingEventFactory(CloudwatchEventFactory):
         model = HistoricalPollingEvent
 
     detail = SubFactory(DetailFactory)
+
+
+class SnsData:
+    def __init__(self, Message):
+        self.Message = Message
+
+
+class SnsDataFactory(Factory):
+    class Meta:
+        model = SnsData
+    Message = FuzzyText()
+
+
+class SnsRecord:
+    def __init__(self, Sns, EventSource, EventVersion, EventSubscriptionArn):
+        self.Sns = Sns
+        self.EventSource = EventSource
+        self.EventVersion = EventVersion
+        self.EventSubscriptionArn = EventSubscriptionArn
+
+
+class SnsRecordFactory(Factory):
+    class Meta:
+        model = SnsRecord
+
+    EventSource = "aws:sns"
+    EventSubscriptionArn = FuzzyText()
+    EventVersion = "1.0"
+    Sns = SubFactory(SnsDataFactory)

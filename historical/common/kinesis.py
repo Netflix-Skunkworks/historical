@@ -1,3 +1,10 @@
+"""
+.. module: historical.common.kinesis
+    :platform: Unix
+    :copyright: (c) 2018 by Netflix Inc., see AUTHORS for more
+    :license: Apache, see LICENSE for more details.
+.. author:: Kevin Glisson <kglisson@netflix.com>
+"""
 import sys
 
 import json
@@ -54,18 +61,3 @@ def produce_events(events, stream):
             Records=chunk,
             StreamName=stream
         )
-
-
-def deserialize_records(records):
-    """
-    Kinesis records come in a base64 encoded format. This function
-    parses these records and returns native python data structures.
-    """
-    native_records = []
-    for r in records:
-        native_records.append(
-            json.loads(
-                base64.b64decode(r['kinesis']['data'])
-            )
-        )
-    return native_records
