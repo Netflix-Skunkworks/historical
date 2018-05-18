@@ -82,7 +82,6 @@ def delete_differ_record(old_image, durable_model, region_attr):
         return
 
     data['configuration'] = {}
-
     # we give our own timestamps for TTL deletions
     del data['eventTime']
     durable_model(**data).save()
@@ -146,5 +145,6 @@ def process_dynamodb_differ_record(record, durable_model, diff_func=None, region
         if record.get('userIdentity'):
             if record['userIdentity']['type'] == 'Service':
                 if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
+                    log.error('We received a TTL delete. Old Image: {}'.format(record['dynamodb']['OldImage']))
                     old_image = remove_current_specific_fields(record['dynamodb']['OldImage'])
                     delete_differ_record(old_image, durable_model, region_attr)

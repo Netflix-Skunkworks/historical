@@ -12,7 +12,6 @@ from datetime import datetime
 from marshmallow import Schema, fields
 from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
 
-from historical.constants import CURRENT_REGION
 from historical.attributes import EventTimeAttribute
 
 
