@@ -32,6 +32,8 @@ def default_diff(latest_config, current_config):
 def remove_current_specific_fields(obj):
     """Remove all fields that belong to the Current table -- that don't belong in the Durable table"""
     # DynamoDB Global Table items:
+    # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables_HowItWorks.html
+    obj.pop("aws:rep:deleting", None)
     obj.pop("aws:rep:updatetime", None)
     obj.pop("aws:rep:updateregion", None)
 

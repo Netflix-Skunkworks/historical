@@ -24,7 +24,6 @@ with open(os.path.join(ROOT, "historical", "__about__.py")) as f:
 install_requires = [
     'cloudaux>=1.4.14',
     'click>=6.7',
-    'click-log>=0.2.1',
     'pynamodb>=3.1.0',
     'deepdiff>=3.3.0',
     'raven-python-lambda>=0.1.7',
