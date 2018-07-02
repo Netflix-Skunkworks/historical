@@ -6,17 +6,21 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
 import json
+import os
 import time
 from datetime import datetime
+
+import boto3
+
+from historical.common.sqs import get_queue_url
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
-    KinesisDataFactory,
-    KinesisRecordFactory,
     RecordsFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
     DynamoDBRecordsFactory,
+    SQSDataFactory,
     UserIdentityFactory,
     serialize
 )
@@ -103,17 +107,16 @@ def test_durable_table(durable_vpc_table):
     assert len(items) == 2
 
 
-def test_poller(historical_kinesis, historical_role, mock_lambda_environment, vpcs, swag_accounts):
+def test_poller(historical_sqs, historical_role, mock_lambda_environment, vpcs, swag_accounts):
     from historical.vpc.poller import handler
     handler({}, None)
 
-    shard_id = historical_kinesis.describe_stream(
-        StreamName='historicalstream')['StreamDescription']['Shards'][0]['ShardId']
-    iterator = historical_kinesis.get_shard_iterator(
-        StreamName='historicalstream', ShardId=shard_id, ShardIteratorType='AT_SEQUENCE_NUMBER',
-        StartingSequenceNumber='0')
-    records = historical_kinesis.get_records(ShardIterator=iterator['ShardIterator'])
-    assert len(records['Records']) == 2
+    # Need to ensure that 2 total VPCs were added into SQS:
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    queue_url = get_queue_url(os.environ['POLLER_QUEUE_NAME'])
+
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
+    assert len(messages) == 2
 
 
 def test_differ(durable_vpc_table, mock_lambda_environment):
@@ -286,12 +289,7 @@ def test_collector(historical_role, mock_lambda_environment, vpcs, current_vpc_t
         ),
     )
     data = json.dumps(event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
@@ -306,12 +304,7 @@ def test_collector(historical_role, mock_lambda_environment, vpcs, current_vpc_t
         ),
     )
     data = json.dumps(event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 

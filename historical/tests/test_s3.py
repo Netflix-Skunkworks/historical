@@ -15,19 +15,19 @@ from datetime import datetime
 
 from botocore.exceptions import ClientError
 
+from historical.common.sqs import get_queue_url
 from historical.s3.models import s3_polling_schema, CurrentS3Model
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
-    KinesisDataFactory,
-    KinesisRecordFactory,
     RecordsFactory,
     serialize,
+    SQSDataFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
     DynamoDBRecordsFactory,
-    UserIdentityFactory,
-    SnsRecordFactory, SnsDataFactory)
+    UserIdentityFactory
+)
 
 S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
@@ -93,11 +93,12 @@ def test_buckets_fixture(buckets):
 
 def test_schema_serialization():
     # Make an object to serialize:
-    now = datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + "Z"
+    regular_now = datetime.utcnow()
+    now_string = regular_now.replace(tzinfo=None, microsecond=0).isoformat() + "Z"
 
     bucket_details = {
-        "bucket_name": "muhbucket",
-        "creation_date": now,
+        "Name": "muhbucket",
+        "CreationDate": regular_now,
     }
 
     serialized = s3_polling_schema.serialize_me("012345678910", bucket_details)
@@ -121,7 +122,7 @@ def test_schema_serialization():
     assert loaded_serialized["detail"]["requestParameters"]["bucketName"] == \
            loaded_data["detail"]["request_parameters"]["bucket_name"] == "muhbucket"
     assert loaded_serialized["detail"]["requestParameters"]["creationDate"] == \
-           loaded_data["detail"]["request_parameters"]["creation_date"] == now
+           loaded_data["detail"]["request_parameters"]["creation_date"] == now_string
 
 
 def test_current_table(current_s3_table):
@@ -153,32 +154,35 @@ def test_durable_table(durable_s3_table):
     assert len(items) == 2
 
 
-def test_poller(historical_role, buckets, mock_lambda_environment, historical_kinesis, swag_accounts):
+def test_poller(historical_role, buckets, mock_lambda_environment, historical_sqs, swag_accounts):
     from historical.s3.poller import handler
-    os.environ["MAX_BUCKET_BATCH"] = "4"
     handler({}, None)
 
-    # Need to ensure that 50 Buckets were added to the stream:
-    kinesis = boto3.client("kinesis", region_name="us-east-1")
+    # Need to ensure that 51 total buckets were added into SQS:
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    queue_url = get_queue_url(os.environ['POLLER_QUEUE_NAME'])
 
     all_buckets = {"SWAG": True}
     for i in range(0, 50):
         all_buckets["testbucket{}".format(i)] = True
 
-    # Loop through the stream and make sure all buckets are accounted for:
-    shard_id = kinesis.describe_stream(StreamName="historicalstream")["StreamDescription"]["Shards"][0]["ShardId"]
-    iterator = kinesis.get_shard_iterator(StreamName="historicalstream", ShardId=shard_id,
-                                          ShardIteratorType="AT_SEQUENCE_NUMBER", StartingSequenceNumber="0")
-    records = kinesis.get_records(ShardIterator=iterator["ShardIterator"])
-    for r in records["Records"]:
-        data = s3_polling_schema.loads(r["Data"]).data
+    # Loop through the queue and make sure all buckets are accounted for:
+    for i in range(0, 6):
+        messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
+        message_ids = []
 
-        assert all_buckets[data["detail"]["request_parameters"]["bucket_name"]]
-        assert datetime.strptime(data["detail"]["request_parameters"]["creation_date"], '%Y-%m-%dT%H:%M:%SZ')
-        assert data["detail"]["event_source"] == "historical.s3.poller"
+        for m in messages:
+            message_ids.append({"Id": m['MessageId'], "ReceiptHandle": m['ReceiptHandle']})
+            data = s3_polling_schema.loads(m['Body']).data
 
-        # Remove from the dict (at the end, there should be 0 items left)
-        del all_buckets[data["detail"]["request_parameters"]["bucket_name"]]
+            assert all_buckets[data["detail"]["request_parameters"]["bucket_name"]]
+            assert datetime.strptime(data["detail"]["request_parameters"]["creation_date"], '%Y-%m-%dT%H:%M:%SZ')
+            assert data["detail"]["event_source"] == "historical.s3.poller"
+
+            # Remove from the dict (at the end, there should be 0 items left)
+            del all_buckets[data["detail"]["request_parameters"]["bucket_name"]]
+
+        sqs.delete_message_batch(QueueUrl=queue_url, Entries=message_ids)
 
     assert len(all_buckets) == 0
 
@@ -188,10 +192,10 @@ def test_poller(historical_role, buckets, mock_lambda_environment, historical_ki
     def mocked_poller(account, stream):
         raise ClientError({"Error": {"Message": "", "Code": "AccessDenied"}}, "sts:AssumeRole")
 
-    old_method = historical.s3.poller.create_polling_event  # For pytest inter-test issues...
-    historical.s3.poller.create_polling_event = mocked_poller
+    old_method = historical.s3.poller.produce_events  # For pytest inter-test issues...
+    historical.s3.poller.produce_events = mocked_poller
     handler({}, None)
-    historical.s3.poller.create_polling_event = old_method
+    historical.s3.poller.produce_events = old_method
     # ^^ No exception = pass
 
 
@@ -210,12 +214,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
         )
     )
     data = json.dumps(create_event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
@@ -241,12 +240,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
         )
     )
     data = json.dumps(polling_event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
@@ -270,50 +264,45 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
         )
     )
     data = json.dumps(delete_event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
     handler(data, None)
     assert CurrentS3Model.count() == 0
 
 
-def test_collector_sns(historical_role, buckets, mock_lambda_environment, swag_accounts, current_s3_table):
-    from historical.s3.collector import handler
-
-    now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
-    create_event = CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            eventSource="aws.s3",
-            eventName="CreateBucket",
-            eventTime=now
-        )
-    )
-    data = json.dumps(create_event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            SnsRecordFactory(
-                Sns=SnsDataFactory(Message=data))
-        ]
-    )
-    data = json.dumps(data, default=serialize)
-    data = json.loads(data)
-
-    handler(data, None)
-    result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
-    assert len(result) == 1
-    # Verify that the tags are duplicated in the top level and configuration:
-    assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
-    assert result[0].Tags.attribute_values["theBucketName"] == \
-           result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
-    assert result[0].eventSource == "aws.s3"
+# def test_collector_sns(historical_role, buckets, mock_lambda_environment, swag_accounts, current_s3_table):
+#     from historical.s3.collector import handler
+#
+#     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
+#     create_event = CloudwatchEventFactory(
+#         detail=DetailFactory(
+#             requestParameters={
+#                 "bucketName": "testbucket1"
+#             },
+#             eventSource="aws.s3",
+#             eventName="CreateBucket",
+#             eventTime=now
+#         )
+#     )
+#     data = json.dumps(create_event, default=serialize)
+#     data = RecordsFactory(
+#         records=[
+#             SnsRecordFactory(
+#                 Sns=SnsDataFactory(Message=data))
+#         ]
+#     )
+#     data = json.dumps(data, default=serialize)
+#     data = json.loads(data)
+#
+#     handler(data, None)
+#     result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
+#     assert len(result) == 1
+#     # Verify that the tags are duplicated in the top level and configuration:
+#     assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
+#     assert result[0].Tags.attribute_values["theBucketName"] == \
+#            result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
+#     assert result[0].eventSource == "aws.s3"
 
 
 def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_environment, swag_accounts,
@@ -332,12 +321,7 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_envir
         )
     )
     create_event_data = json.dumps(create_event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=create_event_data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=create_event_data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 

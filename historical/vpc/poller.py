@@ -16,7 +16,7 @@ from cloudaux.aws.ec2 import describe_vpcs
 from historical.constants import POLL_REGIONS, HISTORICAL_ROLE
 from historical.vpc.models import vpc_polling_schema
 from historical.common.accounts import get_historical_accounts
-from historical.common.kinesis import produce_events
+from historical.common.sqs import produce_events, get_queue_url
 
 logging.basicConfig()
 log = logging.getLogger("historical")
@@ -26,14 +26,16 @@ log.setLevel(logging.INFO)
 @RavenLambdaWrapper()
 def handler(event, context):
     """
-    Historical VPC event poller.
+    Historical VPC Poller.
 
-    This poller is run at a set interval in order to ensure that changes do not go undetected by historical.
+    This Poller is run at a set interval in order to ensure that changes do not go undetected by historical.
 
-    Historical pollers generate `polling events` which simulate changes. These polling events contain configuration
+    Historical Pollers generate `polling events` which simulate changes. These polling events contain configuration
     data such as the account/region defining where the collector should attempt to gather data from.
     """
     log.debug('Running poller. Configuration: {}'.format(event))
+
+    queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalVPCEvents'))
 
     for account in get_historical_accounts():
         for region in POLL_REGIONS:
@@ -45,7 +47,7 @@ def handler(event, context):
                 )
 
                 events = [vpc_polling_schema.serialize(account['id'], v) for v in vpcs]
-                produce_events(events, os.environ.get('HISTORICAL_STREAM', 'HistoricalVPCPollerStream'))
+                produce_events(events, queue_url)
                 log.debug('Finished generating polling events. Account: {}/{} '
                           'Events Created: {}'.format(account['id'], region, len(events)))
             except ClientError as e:
