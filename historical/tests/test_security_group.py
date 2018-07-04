@@ -6,20 +6,24 @@
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
 import json
+import os
 import time
 from datetime import datetime
+
+import boto3
+
+from historical.common.sqs import get_queue_url
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
-    KinesisDataFactory,
-    KinesisRecordFactory,
     RecordsFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
     DynamoDBRecordsFactory,
     UserIdentityFactory,
-    serialize
-)
+    serialize,
+    SQSDataFactory)
+
 
 SECURITY_GROUP = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568',
@@ -146,17 +150,16 @@ def test_durable_table(durable_security_group_table):
     assert len(items) == 2
 
 
-def test_poller(historical_kinesis, historical_role, mock_lambda_environment, security_groups, swag_accounts):
+def test_poller(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
     from historical.security_group.poller import handler
     handler(None, None)
 
-    shard_id = historical_kinesis.describe_stream(
-        StreamName="historicalstream")["StreamDescription"]["Shards"][0]["ShardId"]
-    iterator = historical_kinesis.get_shard_iterator(
-        StreamName="historicalstream", ShardId=shard_id, ShardIteratorType="AT_SEQUENCE_NUMBER",
-        StartingSequenceNumber="0")
-    records = historical_kinesis.get_records(ShardIterator=iterator["ShardIterator"])
-    assert len(records['Records']) == 3
+    # Need to ensure that 3 total SGs were added into SQS:
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    queue_url = get_queue_url(os.environ['POLLER_QUEUE_NAME'])
+
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
+    assert len(messages) == 3
 
 
 def test_differ(durable_security_group_table, mock_lambda_environment):
@@ -297,7 +300,8 @@ def test_differ(durable_security_group_table, mock_lambda_environment):
     assert DurableSecurityGroupModel.count() == 4
 
 
-def test_collector(historical_role, mock_lambda_environment, security_groups, current_security_group_table):
+def test_collector(historical_role, mock_lambda_environment, historical_sqs, security_groups,
+                   current_security_group_table):
     from historical.security_group.models import CurrentSecurityGroupModel
     from historical.security_group.collector import handler
     event = CloudwatchEventFactory(
@@ -307,12 +311,7 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
         ),
     )
     data = json.dumps(event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
@@ -327,12 +326,7 @@ def test_collector(historical_role, mock_lambda_environment, security_groups, cu
         ),
     )
     data = json.dumps(event, default=serialize)
-    data = RecordsFactory(
-        records=[
-            KinesisRecordFactory(
-                kinesis=KinesisDataFactory(data=data))
-        ]
-    )
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 

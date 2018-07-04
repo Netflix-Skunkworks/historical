@@ -8,12 +8,11 @@
 """
 import os
 import pytest
-from datetime import datetime
 
 import boto3
+from moto import mock_sqs
 
 from moto.dynamodb2 import mock_dynamodb2
-from moto.kinesis import mock_kinesis
 from moto.s3 import mock_s3
 from moto.iam import mock_iam
 from moto.sts import mock_sts
@@ -110,11 +109,18 @@ def historical_role(iam, sts):
 
 
 @pytest.fixture(scope='function')
-def historical_kinesis():
-    with mock_kinesis():
-        client = boto3.client('kinesis', region_name='us-east-1')
-        client.create_stream(StreamName='historicalstream', ShardCount=1)
-        os.environ['HISTORICAL_STREAM'] = 'historicalstream'
+def historical_sqs():
+    with mock_sqs():
+        client = boto3.client('sqs', region_name='us-east-1')
+
+        # Poller Queue:
+        client.create_queue(QueueName='pollerqueue')
+        os.environ['POLLER_QUEUE_NAME'] = 'pollerqueue'
+
+        # Event Queue:
+        client.create_queue(QueueName='eventqueue')
+        os.environ['EVENT_QUEUE_NAME'] = 'eventqueue'
+
         yield client
 
 

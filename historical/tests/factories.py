@@ -7,7 +7,6 @@
 """
 
 import pytz
-import base64
 import datetime
 from boto3.dynamodb.types import TypeSerializer
 from factory import SubFactory, Factory, post_generation
@@ -66,28 +65,26 @@ class UserIdentityFactory(Factory):
     type = 'Service'
 
 
-class KinesisData(object):
-    def __init__(self, data):
-        self.data = base64.b64encode(data.encode('utf-8'))
+class SQSData(object):
+    def __init__(self, messageId, receiptHandle, body):
+        self.messageId = messageId
+        self.receiptHandle = receiptHandle
+        self.body = body
+        self.eventSource = "aws:sqs"
 
 
-class KinesisDataFactory(Factory):
+class SQSDataFactory(Factory):
     class Meta:
-        model = KinesisData
-    data = FuzzyText()
+        model = SQSData
+
+    body = FuzzyText()
+    messageId = FuzzyText()
+    receiptHandle = FuzzyText()
 
 
-class KinesisRecord(object):
-    def __init__(self, kinesis):
-        self.kinesis = kinesis
-
-
-class KinesisRecordFactory(Factory):
-    """Factory generating a Kinesis record"""
-    class Meta:
-        model = KinesisRecord
-
-    kinesis = SubFactory(KinesisDataFactory)
+class SQSRecord(object):
+    def __init__(self, sqs):
+        self.sqs = sqs
 
 
 class Records(object):

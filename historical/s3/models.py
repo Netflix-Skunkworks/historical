@@ -37,6 +37,7 @@ class ViewIndex(GlobalSecondaryIndex):
     class Meta:
         projection = AllProjection()
         region = CURRENT_REGION
+
     view = NumberAttribute(default=0, hash_key=True)
 
 
@@ -75,7 +76,11 @@ class S3PollingEventModel(HistoricalPollingBaseModel):
         return self.dumps({
             "account": account,
             "detail": {
-                "request_parameters": bucket_details
+                "request_parameters": {
+                    "bucket_name": bucket_details["Name"],
+                    "creation_date": bucket_details["CreationDate"].replace(
+                        tzinfo=None, microsecond=0).isoformat() + "Z"
+                }
             }
         }).data
 
