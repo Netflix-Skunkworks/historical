@@ -19,11 +19,10 @@ from historical.tests.factories import (
     RecordsFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
-    DynamoDBRecordsFactory,
     SQSDataFactory,
     UserIdentityFactory,
-    serialize
-)
+    serialize,
+    SnsDataFactory)
 
 VPC = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343',
@@ -37,39 +36,39 @@ VPC = {
     'Tags': [{'Key': 'name', 'Value': 'vpc0'}],
     'Region': 'us-east-1',
     'configuration': {
-            'CidrBlock': 'string',
-            'DhcpOptionsId': 'string',
-            'State': 'available',
-            'VpcId': 'string',
-            'InstanceTenancy': 'default',
-            'Ipv6CidrBlockAssociationSet': [
-                {
-                    'AssociationId': 'string',
-                    'Ipv6CidrBlock': 'string',
-                    'Ipv6CidrBlockState': {
-                        'State': 'associated',
-                        'StatusMessage': 'string'
-                    }
-                },
-            ],
-            'CidrBlockAssociationSet': [
-                {
-                    'AssociationId': 'string',
-                    'CidrBlock': 'string',
-                    'CidrBlockState': {
-                        'State': 'associated',
-                        'StatusMessage': 'string'
-                    }
-                },
-            ],
-            'IsDefault': True,
-            'Tags': [
-                {
-                    'Key': 'name',
-                    'Value': 'vpc0'
-                },
-            ]
-        },
+        'CidrBlock': 'string',
+        'DhcpOptionsId': 'string',
+        'State': 'available',
+        'VpcId': 'string',
+        'InstanceTenancy': 'default',
+        'Ipv6CidrBlockAssociationSet': [
+            {
+                'AssociationId': 'string',
+                'Ipv6CidrBlock': 'string',
+                'Ipv6CidrBlockState': {
+                    'State': 'associated',
+                    'StatusMessage': 'string'
+                }
+            },
+        ],
+        'CidrBlockAssociationSet': [
+            {
+                'AssociationId': 'string',
+                'CidrBlock': 'string',
+                'CidrBlockState': {
+                    'State': 'associated',
+                    'StatusMessage': 'string'
+                }
+            },
+        ],
+        'IsDefault': True,
+        'Tags': [
+            {
+                'Key': 'name',
+                'Value': 'vpc0'
+            },
+        ]
+    },
 }
 
 
@@ -119,7 +118,7 @@ def test_poller(historical_sqs, historical_role, mock_lambda_environment, vpcs, 
     assert len(messages) == 2
 
 
-def test_differ(durable_vpc_table, mock_lambda_environment):
+def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     from historical.vpc.models import DurableVPCModel
     from historical.vpc.differ import handler
     from historical.models import TTL_EXPIRY
@@ -129,50 +128,29 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     new_vpc.pop("eventSource")
     new_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     new_vpc['ttl'] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=new_vpc,
-                    Keys={
-                        'arn': new_vpc['arn']
-                    }
-                ),
-                eventName='INSERT'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=new_vpc,
+        Keys={
+            'arn': new_vpc['arn']
+        }
+    ), eventName='INSERT'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-
-    # First, test that nothing happens if the differ event region is different (global table complexity):
-    import historical.common.dynamodb
-    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
-    handler(data, None)
-    assert not DurableVPCModel.count()
-
-    # Back to the original region...
-    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableVPCModel.count() == 1
 
+    # ensure no new record for the same data
     duplicate_vpc = VPC.copy()
     duplicate_vpc.pop("eventSource")
     duplicate_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     duplicate_vpc['ttl'] = ttl
-    # ensure no new record for the same data
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=duplicate_vpc,
-                    Keys={
-                        'arn': duplicate_vpc['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=duplicate_vpc,
+        Keys={
+            'arn': duplicate_vpc['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableVPCModel.count() == 1
@@ -182,19 +160,13 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['State'] = 'changeme'
     updated_vpc['ttl'] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=updated_vpc,
-                    Keys={
-                        'arn': VPC['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=updated_vpc,
+        Keys={
+            'arn': VPC['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableVPCModel.count() == 2
@@ -204,19 +176,13 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['CidrBlock'] = 'changeme'
     updated_vpc['ttl'] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=updated_vpc,
-                    Keys={
-                        'arn': VPC['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=updated_vpc,
+        Keys={
+            'arn': VPC['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableVPCModel.count() == 3
@@ -226,19 +192,13 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=31, second=0).isoformat() + 'Z'
     updated_vpc.update({'Name': 'blah'})
     updated_vpc['ttl'] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=updated_vpc,
-                    Keys={
-                        'arn': VPC['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=updated_vpc,
+        Keys={
+            'arn': VPC['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableVPCModel.count() == 4
@@ -249,32 +209,19 @@ def test_differ(durable_vpc_table, mock_lambda_environment):
     deleted_vpc['ttl'] = ttl
 
     # ensure new record
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    OldImage=deleted_vpc,
-                    Keys={
-                        'arn': VPC['arn']
-                    }
-                ),
-                eventName='REMOVE',
-                userIdentity=UserIdentityFactory(
-                    type='Service',
-                    principalId='dynamodb.amazonaws.com'
-                )
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        OldImage=deleted_vpc,
+        Keys={
+            'arn': VPC['arn']
+        }
+    ),
+        eventName='REMOVE',
+        userIdentity=UserIdentityFactory(
+            type='Service',
+            principalId='dynamodb.amazonaws.com'
+        )), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-
-    # First, test that nothing happens if the differ event region is different (global table complexity):
-    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
-    handler(data, None)
-    assert DurableVPCModel.count() == 4
-
-    # Back to the original region...
-    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableVPCModel.count() == 5
 

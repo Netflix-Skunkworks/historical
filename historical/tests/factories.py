@@ -230,29 +230,17 @@ class HistoricalPollingEventFactory(CloudwatchEventFactory):
 
 
 class SnsData:
-    def __init__(self, Message):
+    def __init__(self, Message, EventSource, EventVersion, EventSubscriptionArn):
         self.Message = Message
+        self.EventSource = EventSource
+        self.EventVersion = EventVersion
+        self.EventSubscriptionArn = EventSubscriptionArn
 
 
 class SnsDataFactory(Factory):
     class Meta:
         model = SnsData
     Message = FuzzyText()
-
-
-class SnsRecord:
-    def __init__(self, Sns, EventSource, EventVersion, EventSubscriptionArn):
-        self.Sns = Sns
-        self.EventSource = EventSource
-        self.EventVersion = EventVersion
-        self.EventSubscriptionArn = EventSubscriptionArn
-
-
-class SnsRecordFactory(Factory):
-    class Meta:
-        model = SnsRecord
-
+    EventVersion = FuzzyText()
     EventSource = "aws:sns"
     EventSubscriptionArn = FuzzyText()
-    EventVersion = "1.0"
-    Sns = SubFactory(SnsDataFactory)

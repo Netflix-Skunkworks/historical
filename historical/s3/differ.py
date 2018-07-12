@@ -11,7 +11,7 @@ from deepdiff import DeepDiff
 
 from raven_python_lambda import RavenLambdaWrapper
 
-from historical.s3.models import DurableS3Model
+from historical.s3.models import DurableS3Model, CurrentS3Model
 from historical.common.dynamodb import process_dynamodb_differ_record
 
 deser = TypeDeserializer()
@@ -47,4 +47,4 @@ def handler(event, context):
     historical record.
     """
     for record in event['Records']:
-        process_dynamodb_differ_record(record, DurableS3Model, diff_func=is_new_revision)
+        process_dynamodb_differ_record(record, CurrentS3Model, DurableS3Model, diff_func=is_new_revision)

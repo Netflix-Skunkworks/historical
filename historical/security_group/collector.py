@@ -15,6 +15,7 @@ from raven_python_lambda import RavenLambdaWrapper
 
 from cloudaux.aws.ec2 import describe_security_groups
 
+from historical.common.sqs import group_records_by_type
 from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records
@@ -47,26 +48,6 @@ def get_arn(group_id, account_id):
         region=CURRENT_REGION,
         account_id=account_id
     )
-
-
-def group_records_by_type(records):
-    """Break records into two lists; create/update events and delete events."""
-    update_records, delete_records = [], []
-    for r in records:
-        # TODO remove
-        if isinstance(r, str):
-            break
-
-        if r.get("detail-type", "") == "Scheduled Event":
-            log.error("[X] Received a Scheduled Event in the stream... Please check that your environment is set up"
-                      " correctly.")
-            continue
-
-        if r['detail']['eventName'] in UPDATE_EVENTS:
-            update_records.append(r)
-        else:
-            delete_records.append(r)
-    return update_records, delete_records
 
 
 def describe_group(record):
@@ -198,7 +179,7 @@ def handler(event, context):
 
     # Split records into two groups, update and delete.
     # We don't want to query for deleted records.
-    update_records, delete_records = group_records_by_type(records)
+    update_records, delete_records = group_records_by_type(records, UPDATE_EVENTS)
     capture_delete_records(delete_records)
 
     # filter out error events

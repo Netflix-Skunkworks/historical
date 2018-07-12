@@ -12,25 +12,17 @@ def deserialize_records(records):
     """
     This properly deserializes records depending on where they came from:
         - SQS
+        - SNS
     """
     native_records = []
     for r in records:
-        native_records.append(json.loads(r['body']))
+        parsed = json.loads(r['body'])
 
-        # Is this from SNS?
-        # if r.get('Sns'):
-        #     native_records.append(
-        #         json.loads(
-        #             r['Sns']['Message']
-        #         )
-        #     )
+        # Is this from SNS (cross-region request -- SNS messages wrapped in SQS message)?
+        if parsed.get('Type') == 'Notification' and parsed.get('Message'):
+            native_records.append(json.loads(parsed['Message']))
 
-        # Is this from Kinesis? (Kinesis records come in a base64 encoded format)
-        # elif r.get('kinesis'):
-        #     native_records.append(
-        #         json.loads(
-        #             base64.b64decode(r['kinesis']['data'])
-        #         )
-        #     )
+        else:
+            native_records.append(parsed)
 
     return native_records

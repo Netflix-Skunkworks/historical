@@ -25,9 +25,8 @@ from historical.tests.factories import (
     SQSDataFactory,
     DynamoDBDataFactory,
     DynamoDBRecordFactory,
-    DynamoDBRecordsFactory,
-    UserIdentityFactory
-)
+    UserIdentityFactory,
+    SnsDataFactory)
 
 S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
@@ -271,40 +270,6 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     assert CurrentS3Model.count() == 0
 
 
-# def test_collector_sns(historical_role, buckets, mock_lambda_environment, swag_accounts, current_s3_table):
-#     from historical.s3.collector import handler
-#
-#     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
-#     create_event = CloudwatchEventFactory(
-#         detail=DetailFactory(
-#             requestParameters={
-#                 "bucketName": "testbucket1"
-#             },
-#             eventSource="aws.s3",
-#             eventName="CreateBucket",
-#             eventTime=now
-#         )
-#     )
-#     data = json.dumps(create_event, default=serialize)
-#     data = RecordsFactory(
-#         records=[
-#             SnsRecordFactory(
-#                 Sns=SnsDataFactory(Message=data))
-#         ]
-#     )
-#     data = json.dumps(data, default=serialize)
-#     data = json.loads(data)
-#
-#     handler(data, None)
-#     result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
-#     assert len(result) == 1
-#     # Verify that the tags are duplicated in the top level and configuration:
-#     assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
-#     assert result[0].Tags.attribute_values["theBucketName"] == \
-#            result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
-#     assert result[0].eventSource == "aws.s3"
-
-
 def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_environment, swag_accounts,
                                      current_s3_table):
     from historical.s3.collector import handler
@@ -329,7 +294,7 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_envir
     assert CurrentS3Model.count() == 0
 
 
-def test_differ(durable_s3_table, mock_lambda_environment):
+def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     from historical.s3.models import DurableS3Model
     from historical.s3.differ import handler
     from historical.models import TTL_EXPIRY
@@ -338,29 +303,15 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     new_bucket = S3_BUCKET.copy()
     new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     new_bucket["ttl"] = ttl
-    new_item = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=new_bucket,
-                    Keys={
-                        'arn': new_bucket['arn']
-                    }
-                ),
-                eventName='INSERT'
-            )
-        ]
-    )
+    ddb_record = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=new_bucket, Keys={
+            'arn': new_bucket['arn']
+        }),
+        eventName='INSERT'), default=serialize)
+
+    new_item = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=ddb_record),
+                                                                      default=serialize))])
     data = json.loads(json.dumps(new_item, default=serialize))
-
-    # First, test that nothing happens if the differ event region is different (global table complexity):
-    import historical.common.dynamodb
-    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
-    handler(data, None)
-    assert not DurableS3Model.count()
-
-    # Back to the original region...
-    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableS3Model.count() == 1
 
@@ -376,19 +327,13 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     ephemeral_changes["configuration"]["_version"] = 99999
     ephemeral_changes["ttl"] = ttl
 
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=ephemeral_changes,
-                    Keys={
-                        'arn': ephemeral_changes['arn']
-                    }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+        NewImage=ephemeral_changes, Keys={
+            'arn': ephemeral_changes['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
+
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     assert DurableS3Model.count() == 1
@@ -400,19 +345,12 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     new_changes["Tags"] = {"ANew": "Tag"}
     new_changes["configuration"]["Tags"] = {"ANew": "Tag"}
     new_changes["ttl"] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    NewImage=new_changes,
-                    Keys={
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+                    NewImage=new_changes, Keys={
                         'arn': new_changes['arn']
                     }
-                ),
-                eventName='MODIFY'
-            )
-        ]
-    )
+                ), eventName='MODIFY'), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, None)
     results = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
@@ -424,12 +362,8 @@ def test_differ(durable_s3_table, mock_lambda_environment):
     delete_bucket = S3_BUCKET.copy()
     delete_bucket["eventTime"] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
     delete_bucket["ttl"] = ttl
-    data = DynamoDBRecordsFactory(
-        records=[
-            DynamoDBRecordFactory(
-                dynamodb=DynamoDBDataFactory(
-                    OldImage=delete_bucket,
-                    Keys={
+    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
+                    OldImage=delete_bucket, Keys={
                         'arn': delete_bucket['arn']
                     }
                 ),
@@ -437,18 +371,8 @@ def test_differ(durable_s3_table, mock_lambda_environment):
                 userIdentity=UserIdentityFactory(
                     type='Service',
                     principalId='dynamodb.amazonaws.com'
-                )
-            )
-        ]
-    )
+                )), default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-
-    # First, test that nothing happens if the differ event region is different (global table complexity):
-    historical.common.dynamodb.DIFF_REGIONS = ["us-west-2"]
-    handler(data, None)
-    assert DurableS3Model.count() == 2
-
-    # Back to the original region...
-    historical.common.dynamodb.DIFF_REGIONS = ["us-east-1"]
     handler(data, None)
     assert DurableS3Model.count() == 3

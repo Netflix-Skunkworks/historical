@@ -36,7 +36,7 @@ def handler(event, context):
     """
     log.debug('Running poller. Configuration: {}'.format(event))
 
-    queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalS3Events'))
+    queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalS3Poller'))
 
     for account in get_historical_accounts():
         # Skip accounts that have role assumption errors:
