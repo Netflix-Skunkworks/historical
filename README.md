@@ -29,6 +29,8 @@ Key Features:
 | route53      | In-progress        |
 
 ## Documentation
-https://historical.readthedocs.com
+We are actively working on documentation for Historical. We will update this soon with the details!
 
+Below is a diagram of the Historical architecture:
+![Historical Architecture](docs/images/historical-overview.png "Historical Architecture Overview")
 
