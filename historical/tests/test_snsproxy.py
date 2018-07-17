@@ -183,7 +183,8 @@ def test_process_sns_forward():
     historical.common.sns.log = old_logger
 
 
-def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment, buckets):
+def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment,
+                                  buckets):
     """
     This mostly checks that the differ is able to properly load the reduced dataset from the SNSProxy.
     """
@@ -215,7 +216,7 @@ def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    current_handler(data, None)
+    current_handler(data, mock_lambda_environment)
     result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(result) == 1
 
@@ -259,7 +260,7 @@ def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_
     records_event = json.loads(json.dumps(records, default=serialize))
 
     # Run the differ:
-    diff_handler(records_event, None)
+    diff_handler(records_event, mock_lambda_environment)
 
     # Verify that the existing bucket in the Current table is in the Durable table with the correct configuration:
     result = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))

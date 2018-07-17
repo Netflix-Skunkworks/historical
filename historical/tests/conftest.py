@@ -202,6 +202,12 @@ def vpcs(ec2):
 def mock_lambda_environment():
     os.environ['SENTRY_ENABLED'] = 'f'
 
+    class MockedContext:
+        def get_remaining_time_in_millis(self):
+            return 99999
+
+    return MockedContext()
+
 
 @pytest.fixture(scope='function')
 def current_security_group_table():

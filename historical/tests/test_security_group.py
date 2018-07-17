@@ -150,7 +150,7 @@ def test_durable_table(durable_security_group_table):
 
 def test_poller(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
     from historical.security_group.poller import handler
-    handler(None, None)
+    handler(None, mock_lambda_environment)
 
     # Need to ensure that 3 total SGs were added into SQS:
     sqs = boto3.client("sqs", region_name="us-east-1")
@@ -178,7 +178,7 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     ), eventName='INSERT'), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableSecurityGroupModel.count() == 1
 
     # ensure no new record for the same data
@@ -194,7 +194,7 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     ), eventName='MODIFY'), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableSecurityGroupModel.count() == 1
 
     updated_group = SECURITY_GROUP.copy()
@@ -210,7 +210,7 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     ), eventName='MODIFY'), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableSecurityGroupModel.count() == 2
 
     updated_group = SECURITY_GROUP.copy()
@@ -226,7 +226,7 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     ), eventName='MODIFY'), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableSecurityGroupModel.count() == 3
 
     deleted_group = SECURITY_GROUP.copy()
@@ -247,7 +247,7 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
         )), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableSecurityGroupModel.count() == 4
 
 
@@ -266,7 +266,7 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, None)
+    handler(data, mock_lambda_environment)
 
     assert CurrentSecurityGroupModel.count() == 1
 
@@ -281,6 +281,6 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, None)
+    handler(data, mock_lambda_environment)
 
     assert CurrentSecurityGroupModel.count() == 0

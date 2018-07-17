@@ -93,7 +93,7 @@ class Records(object):
 
 
 class RecordsFactory(Factory):
-    """Factory for generating multiple Event (SNS, CloudWatch, Kinesis, DynamoDB) records."""
+    """Factory for generating multiple Event (SNS, CloudWatch, Kinesis, DynamoDB, SQS) records."""
     class Meta:
         model = Records
 

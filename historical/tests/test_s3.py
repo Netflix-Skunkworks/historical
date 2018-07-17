@@ -217,7 +217,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(result) == 1
     # Verify that the tags are duplicated in the top level and configuration:
@@ -243,7 +243,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert CurrentS3Model.count() == 1
 
     # Load the config and verify the polling timestamp is in there:
@@ -266,7 +266,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert CurrentS3Model.count() == 0
 
 
@@ -290,7 +290,7 @@ def test_collector_on_deleted_bucket(historical_role, buckets, mock_lambda_envir
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert CurrentS3Model.count() == 0
 
 
@@ -312,12 +312,12 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     new_item = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=ddb_record),
                                                                       default=serialize))])
     data = json.loads(json.dumps(new_item, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 1
 
     # Test duplicates don't change anything:
     data = json.loads(json.dumps(new_item, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 1
 
     # Test ephemeral changes don't add new models:
@@ -335,7 +335,7 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
 
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 1
 
     # Add an update:
@@ -352,7 +352,7 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
                 ), eventName='MODIFY'), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     results = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(results) == 2
     assert results[1].Tags["ANew"] == results[1].configuration.attribute_values["Tags"]["ANew"] == "Tag"
@@ -374,5 +374,5 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
                 )), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
-    handler(data, None)
+    handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 3
