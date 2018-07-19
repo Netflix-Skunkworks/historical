@@ -13,14 +13,14 @@ from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_vpcs
 
-from historical.constants import POLL_REGIONS, HISTORICAL_ROLE
+from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.vpc.models import vpc_polling_schema
 from historical.common.accounts import get_historical_accounts
 from historical.common.sqs import produce_events, get_queue_url
 
 logging.basicConfig()
 log = logging.getLogger("historical")
-log.setLevel(logging.INFO)
+log.setLevel(LOGGING_LEVEL)
 
 
 @RavenLambdaWrapper()
@@ -33,7 +33,7 @@ def handler(event, context):
     Historical Pollers generate `polling events` which simulate changes. These polling events contain configuration
     data such as the account/region defining where the collector should attempt to gather data from.
     """
-    log.debug('Running poller. Configuration: {}'.format(event))
+    log.debug('[@] Running poller. Configuration: {}'.format(event))
 
     queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalVPCPoller'))
 
@@ -48,8 +48,8 @@ def handler(event, context):
 
                 events = [vpc_polling_schema.serialize(account['id'], v) for v in vpcs]
                 produce_events(events, queue_url)
-                log.debug('Finished generating polling events. Account: {}/{} '
+                log.debug('[@] Finished generating polling events. Account: {}/{} '
                           'Events Created: {}'.format(account['id'], region, len(events)))
             except ClientError as e:
-                log.warning('Unable to generate events for account/region. Account Id/Region: {account_id}/{region}'
-                            ' Reason: {reason}'.format(account_id=account['id'], region=region, reason=e))
+                log.error('[X] Unable to generate events for account/region. Account Id/Region: {account_id}/{region}'
+                          ' Reason: {reason}'.format(account_id=account['id'], region=region, reason=e))

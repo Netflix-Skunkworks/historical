@@ -16,15 +16,14 @@ from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
 
 from historical.common.sqs import group_records_by_type
-from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records
 from historical.security_group.models import CurrentSecurityGroupModel
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-level = logging.getLevelName(os.environ.get('HISTORICAL_LOGGING_LEVEL', 'WARNING'))
-log.setLevel(level)
+log.setLevel(LOGGING_LEVEL)
 
 
 UPDATE_EVENTS = [
@@ -82,7 +81,7 @@ def describe_group(record):
                 GroupIds=[group_id]
             )['SecurityGroups']
         else:
-            raise Exception('Describe requires a groupId or a groupName and VpcId.')
+            raise Exception('[X] Describe requires a groupId or a groupName and VpcId.')
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidGroup.NotFound':
             return []
@@ -100,7 +99,7 @@ def create_delete_model(record):
 
     arn = get_arn(group_id, record['account'])
 
-    log.debug('Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
+    log.debug('[-] Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
 
     # tombstone these records so that the deletion event time can be accurately tracked.
     data.update({
@@ -125,11 +124,11 @@ def capture_delete_records(records):
             try:
                 model.delete(condition=(CurrentSecurityGroupModel.eventTime <= r['detail']['eventTime']))
             except DeleteError as _:
-                log.warning('Unable to delete security group. Security group does not exist. Record: {record}'.format(
+                log.warning('[X] Unable to delete security group. Security group does not exist. Record: {record}'.format(
                     record=r
                 ))
         else:
-            log.warning('Unable to delete security group. Security group does not exist. Record: {record}'.format(
+            log.warning('[?] Unable to delete security group. Security group does not exist. Record: {record}'.format(
                 record=r
             ))
 
@@ -141,10 +140,10 @@ def capture_update_records(records):
         group = describe_group(record)
 
         if len(group) > 1:
-            raise Exception('Multiple groups found. Record: {record}'.format(record=record))
+            raise Exception('[X] Multiple groups found. Record: {record}'.format(record=record))
 
         if not group:
-            log.warning('No group information found. Record: {record}'.format(record=record))
+            log.warning('[?] No group information found. Record: {record}'.format(record=record))
             continue
 
         group = group[0]
@@ -186,6 +185,6 @@ def handler(event, context):
     update_records = [e for e in update_records if not e['detail'].get('errorCode')]
 
     # group records by account for more efficient processing
-    log.debug('Update Records: {records}'.format(records=records))
+    log.debug('[@] Update Records: {records}'.format(records=records))
 
     capture_update_records(update_records)

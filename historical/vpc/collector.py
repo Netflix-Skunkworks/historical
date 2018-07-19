@@ -5,7 +5,6 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
-import os
 import logging
 
 from botocore.exceptions import ClientError
@@ -16,15 +15,14 @@ from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_vpcs
 
 from historical.common.sqs import group_records_by_type
-from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records
 from historical.vpc.models import CurrentVPCModel
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-level = logging.getLevelName(os.environ.get('HISTORICAL_LOGGING_LEVEL', 'WARNING'))
-log.setLevel(level)
+log.setLevel(LOGGING_LEVEL)
 
 
 UPDATE_EVENTS = [
@@ -74,7 +72,7 @@ def describe_vpc(record):
                 VpcIds=[vpc_id]
             )
         else:
-            raise Exception('Describe requires VpcId.')
+            raise Exception('[X] Describe requires VpcId.')
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidVpc.NotFound':
             return []
@@ -89,7 +87,7 @@ def create_delete_model(record):
 
     arn = get_arn(vpc_id, record['account'])
 
-    log.debug('Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
+    log.debug('[-] Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
 
     # tombstone these records so that the deletion event time can be accurately tracked.
     data.update({
@@ -114,11 +112,11 @@ def capture_delete_records(records):
             try:
                 model.delete(condition=(CurrentVPCModel.eventTime <= r['detail']['eventTime']))
             except DeleteError as _:
-                log.warning('Unable to delete VPC. VPC does not exist. Record: {record}'.format(
+                log.warning('[?] Unable to delete VPC. VPC does not exist. Record: {record}'.format(
                     record=r
                 ))
         else:
-            log.warning('Unable to delete VPC. VPC does not exist. Record: {record}'.format(
+            log.warning('[?] Unable to delete VPC. VPC does not exist. Record: {record}'.format(
                 record=r
             ))
 
@@ -137,10 +135,10 @@ def capture_update_records(records):
         vpc = describe_vpc(record)
 
         if len(vpc) > 1:
-            raise Exception('Multiple vpcs found. Record: {record}'.format(record=record))
+            raise Exception('[X] Multiple vpcs found. Record: {record}'.format(record=record))
 
         if not vpc:
-            log.warning('No vpc information found. Record: {record}'.format(record=record))
+            log.warning('[?] No vpc information found. Record: {record}'.format(record=record))
             continue
 
         vpc = vpc[0]
@@ -159,7 +157,7 @@ def capture_update_records(records):
             'Region': cloudwatch.get_region(record)
         })
 
-        log.debug('Writing Dynamodb Record. Records: {record}'.format(record=data))
+        log.debug('[+] Writing Dynamodb Record. Records: {record}'.format(record=data))
 
         current_revision = CurrentVPCModel(**data)
         current_revision.save()
@@ -182,6 +180,6 @@ def handler(event, context):
     update_records = [e for e in update_records if not e['detail'].get('errorCode')]
 
     # group records by account for more efficient processing
-    log.debug('Update Records: {records}'.format(records=records))
+    log.debug('[@] Update Records: {records}'.format(records=records))
 
     capture_update_records(update_records)
