@@ -11,6 +11,7 @@ from deepdiff import DeepDiff
 
 from raven_python_lambda import RavenLambdaWrapper
 
+from historical.constants import LOGGING_LEVEL
 from historical.s3.models import DurableS3Model, CurrentS3Model
 from historical.common.dynamodb import process_dynamodb_differ_record
 
@@ -18,7 +19,7 @@ deser = TypeDeserializer()
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-log.setLevel(logging.WARNING)
+log.setLevel(LOGGING_LEVEL)
 
 # Path to where in the dict the ephemeral field is -- starting with "root['M'][PathInConfigDontForgetDataType]..."
 EPHEMERAL_PATHS = [

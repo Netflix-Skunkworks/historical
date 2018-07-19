@@ -15,13 +15,13 @@ from cloudaux.aws.s3 import list_buckets
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.sqs import get_queue_url, produce_events
-from historical.constants import CURRENT_REGION, HISTORICAL_ROLE
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.s3.models import s3_polling_schema
 from historical.common.accounts import get_historical_accounts
 
 logging.basicConfig()
 log = logging.getLogger("historical")
-log.setLevel(logging.INFO)
+log.setLevel(LOGGING_LEVEL)
 
 
 @RavenLambdaWrapper()
@@ -34,7 +34,7 @@ def handler(event, context):
     Historical pollers generate `polling events` which simulate changes. These polling events contain configuration
     data such as the account/region defining where the collector should attempt to gather data from.
     """
-    log.debug('Running poller. Configuration: {}'.format(event))
+    log.debug('[@] Running poller. Configuration: {}'.format(event))
 
     queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalS3Poller'))
 
@@ -50,9 +50,9 @@ def handler(event, context):
             events = [s3_polling_schema.serialize_me(account['id'], bucket) for bucket in all_buckets]
             produce_events(events, queue_url)
         except ClientError as e:
-            log.warning('Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
+            log.error('[X] Unable to generate events for account. AccountId: {account_id} Reason: {reason}'.format(
                 account_id=account['id'],
                 reason=e
             ))
 
-        log.debug('Finished generating polling events. Events Created: {}'.format(len(account['id'])))
+        log.debug('[@] Finished generating polling events. Events Created: {}'.format(len(account['id'])))

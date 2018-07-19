@@ -11,10 +11,11 @@ from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.dynamodb import process_dynamodb_differ_record
 from historical.security_group.models import DurableSecurityGroupModel, CurrentSecurityGroupModel
+from historical.constants import LOGGING_LEVEL
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-log.setLevel(logging.WARNING)
+log.setLevel(LOGGING_LEVEL)
 
 
 @RavenLambdaWrapper()

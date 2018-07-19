@@ -10,11 +10,12 @@ import logging
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.dynamodb import process_dynamodb_differ_record
+from historical.constants import LOGGING_LEVEL
 from historical.vpc.models import DurableVPCModel, CurrentVPCModel
 
 logging.basicConfig()
 log = logging.getLogger('historical')
-log.setLevel(logging.WARNING)
+log.setLevel(LOGGING_LEVEL)
 
 
 @RavenLambdaWrapper()
