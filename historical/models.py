@@ -71,3 +71,14 @@ class HistoricalPollingBaseModel(Schema):
 
     # You must replace this:
     detail = fields.Nested(HistoricalPollingEventDetail, required=True)
+
+
+class HistoricalPollerTaskEventModel(Schema):
+    account_id = fields.Str(required=True)
+    region = fields.Str(required=True)
+
+    def serialize_me(self, account_id, region):
+        return self.dumps({
+            "account_id": account_id,
+            "region": region
+        }).data
