@@ -13,6 +13,7 @@ from datetime import datetime
 import boto3
 
 from historical.common.sqs import get_queue_url
+from historical.models import HistoricalPollerTaskEventModel
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
@@ -148,9 +149,45 @@ def test_durable_table(durable_security_group_table):
     assert len(items) == 2
 
 
-def test_poller(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
-    from historical.security_group.poller import handler
-    handler(None, mock_lambda_environment)
+def make_poller_events():
+    """A sort-of fixture to make polling events for tests."""
+    from historical.security_group.poller import poller_tasker_handler as handler
+    handler({}, None)
+
+    # Need to ensure that all of the accounts and regions were properly tasked (only 1 region for S3):
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    queue_url = get_queue_url(os.environ['POLLER_TASKER_QUEUE_NAME'])
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
+
+    # 'Body' needs to be made into 'body' for proper parsing later:
+    for m in messages:
+        m['body'] = m.pop('Body')
+
+    return messages
+
+
+def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_accounts):
+    from historical.common.accounts import get_historical_accounts
+    from historical.constants import CURRENT_REGION
+
+    messages = make_poller_events()
+    all_historical_accounts = get_historical_accounts()
+    assert len(messages) == len(all_historical_accounts) == 1
+
+    poller_events = HistoricalPollerTaskEventModel().loads(messages[0]['body']).data
+    assert poller_events['account_id'] == all_historical_accounts[0]['id']
+    assert poller_events['region'] == CURRENT_REGION
+
+
+def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
+    from historical.security_group.poller import poller_processor_handler as handler
+
+    # Create the events and SQS records:
+    messages = make_poller_events()
+    event = json.loads(json.dumps(RecordsFactory(records=messages), default=serialize))
+
+    # Run the collector:
+    handler(event, mock_lambda_environment)
 
     # Need to ensure that 3 total SGs were added into SQS:
     sqs = boto3.client("sqs", region_name="us-east-1")

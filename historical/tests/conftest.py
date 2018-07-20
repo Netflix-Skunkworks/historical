@@ -113,6 +113,10 @@ def historical_sqs():
     with mock_sqs():
         client = boto3.client('sqs', region_name='us-east-1')
 
+        # Poller Tasker Queue:
+        client.create_queue(QueueName='pollertaskerqueue')
+        os.environ['POLLER_TASKER_QUEUE_NAME'] = 'pollertaskerqueue'
+
         # Poller Queue:
         client.create_queue(QueueName='pollerqueue')
         os.environ['POLLER_QUEUE_NAME'] = 'pollerqueue'

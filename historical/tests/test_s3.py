@@ -16,6 +16,7 @@ from datetime import datetime
 from botocore.exceptions import ClientError
 
 from historical.common.sqs import get_queue_url
+from historical.models import HistoricalPollerTaskEventModel
 from historical.s3.models import s3_polling_schema, CurrentS3Model
 from historical.tests.factories import (
     CloudwatchEventFactory,
@@ -119,9 +120,9 @@ def test_schema_serialization():
     assert loaded_serialized["detail"]["eventSource"] == loaded_data["detail"]["event_source"] == "historical.s3.poller"
     assert loaded_serialized["detail"]["eventName"] == loaded_data["detail"]["event_name"] == "DescribeBucket"
     assert loaded_serialized["detail"]["requestParameters"]["bucketName"] == \
-           loaded_data["detail"]["request_parameters"]["bucket_name"] == "muhbucket"
+        loaded_data["detail"]["request_parameters"]["bucket_name"] == "muhbucket"
     assert loaded_serialized["detail"]["requestParameters"]["creationDate"] == \
-           loaded_data["detail"]["request_parameters"]["creation_date"] == now_string
+        loaded_data["detail"]["request_parameters"]["creation_date"] == now_string
 
 
 def test_current_table(current_s3_table):
@@ -153,9 +154,45 @@ def test_durable_table(durable_s3_table):
     assert len(items) == 2
 
 
-def test_poller(historical_role, buckets, mock_lambda_environment, historical_sqs, swag_accounts):
-    from historical.s3.poller import handler
+def make_poller_events():
+    """A sort-of fixture to make polling events for tests."""
+    from historical.s3.poller import poller_tasker_handler as handler
     handler({}, None)
+
+    # Need to ensure that all of the accounts and regions were properly tasked (only 1 region for S3):
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    queue_url = get_queue_url(os.environ['POLLER_TASKER_QUEUE_NAME'])
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
+
+    # 'Body' needs to be made into 'body' for proper parsing later:
+    for m in messages:
+        m['body'] = m.pop('Body')
+
+    return messages
+
+
+def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_accounts):
+    from historical.common.accounts import get_historical_accounts
+    from historical.constants import CURRENT_REGION
+
+    messages = make_poller_events()
+    all_historical_accounts = get_historical_accounts()
+    assert len(messages) == len(all_historical_accounts) == 1
+
+    poller_events = HistoricalPollerTaskEventModel().loads(messages[0]['body']).data
+    assert poller_events['account_id'] == all_historical_accounts[0]['id']
+    assert poller_events['region'] == CURRENT_REGION
+
+
+def test_poller_processor_handler(historical_role, buckets, mock_lambda_environment, historical_sqs, swag_accounts):
+    from historical.s3.poller import poller_processor_handler as handler
+
+    # Create the events and SQS records:
+    messages = make_poller_events()
+    event = json.loads(json.dumps(RecordsFactory(records=messages), default=serialize))
+
+    # Run the collector:
+    handler(event, None)
 
     # Need to ensure that 51 total buckets were added into SQS:
     sqs = boto3.client("sqs", region_name="us-east-1")
@@ -193,7 +230,7 @@ def test_poller(historical_role, buckets, mock_lambda_environment, historical_sq
 
     old_method = historical.s3.poller.produce_events  # For pytest inter-test issues...
     historical.s3.poller.produce_events = mocked_poller
-    handler({}, None)
+    handler(event, None)
     historical.s3.poller.produce_events = old_method
     # ^^ No exception = pass
 
@@ -346,10 +383,10 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     new_changes["configuration"]["Tags"] = {"ANew": "Tag"}
     new_changes["ttl"] = ttl
     data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-                    NewImage=new_changes, Keys={
-                        'arn': new_changes['arn']
-                    }
-                ), eventName='MODIFY'), default=serialize)
+        NewImage=new_changes, Keys={
+            'arn': new_changes['arn']
+        }
+    ), eventName='MODIFY'), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -363,15 +400,15 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     delete_bucket["eventTime"] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
     delete_bucket["ttl"] = ttl
     data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-                    OldImage=delete_bucket, Keys={
-                        'arn': delete_bucket['arn']
-                    }
-                ),
-                eventName='REMOVE',
-                userIdentity=UserIdentityFactory(
-                    type='Service',
-                    principalId='dynamodb.amazonaws.com'
-                )), default=serialize)
+        OldImage=delete_bucket, Keys={
+            'arn': delete_bucket['arn']
+        }
+    ),
+        eventName='REMOVE',
+        userIdentity=UserIdentityFactory(
+            type='Service',
+            principalId='dynamodb.amazonaws.com'
+        )), default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
