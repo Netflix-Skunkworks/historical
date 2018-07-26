@@ -54,10 +54,19 @@ def describe_group(record):
     account_id = record['account']
     group_name = cloudwatch.filter_request_parameters('groupName', record)
     vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
-    group_id = cloudwatch.filter_request_parameters('groupId', record)
+    group_id = cloudwatch.filter_request_parameters('groupId', record, look_in_response=True)
 
     try:
-        if vpc_id and group_name:
+        # Always depend on Group ID first:
+        if group_id:
+            return describe_security_groups(
+                account_number=account_id,
+                assume_role=HISTORICAL_ROLE,
+                region=CURRENT_REGION,
+                GroupIds=[group_id]
+            )['SecurityGroups']
+
+        elif vpc_id and group_name:
             return describe_security_groups(
                 account_number=account_id,
                 assume_role=HISTORICAL_ROLE,
@@ -73,15 +82,10 @@ def describe_group(record):
                     }
                 ]
             )['SecurityGroups']
-        elif group_id:
-            return describe_security_groups(
-                account_number=account_id,
-                assume_role=HISTORICAL_ROLE,
-                region=CURRENT_REGION,
-                GroupIds=[group_id]
-            )['SecurityGroups']
+
         else:
-            raise Exception('[X] Describe requires a groupId or a groupName and VpcId.')
+            raise Exception('[X] Did not receive Group ID or VPC/Group Name pairs. '
+                            'We got: ID: {} VPC/Name: {}/{}.'.format(group_id, vpc_id, group_name))
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidGroup.NotFound':
             return []

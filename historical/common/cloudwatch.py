@@ -15,7 +15,7 @@ from historical.constants import CURRENT_REGION
 logger = logging.getLogger(__name__)
 
 
-def filter_request_parameters(field_name, msg):
+def filter_request_parameters(field_name, msg, look_in_response=False):
     """
     From an event, extract the field name from the message.
     Different API calls put this information in different places, so check a few places.
@@ -24,6 +24,10 @@ def filter_request_parameters(field_name, msg):
 
     if not val:
         val = msg.get('detail', {}).get('requestParameters', {}).get(field_name, None)
+
+    # If we STILL didn't find it -- check if it's in the response element (default off)
+    if not val and look_in_response:
+        val = msg.get('detail', {}).get('responseElements', {}).get(field_name, None)
 
     return val
 
