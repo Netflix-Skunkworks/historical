@@ -321,3 +321,19 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
     handler(data, mock_lambda_environment)
 
     assert CurrentSecurityGroupModel.count() == 0
+
+    # Try to get it again -- this time, add the SG ID to the responseElements:
+    event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            responseElements={'groupId': security_groups['GroupId']},
+            eventName='CreateSecurityGroup'
+        ),
+    )
+    data = json.dumps(event, default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, mock_lambda_environment)
+
+    assert CurrentSecurityGroupModel.count() == 1

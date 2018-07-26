@@ -176,7 +176,8 @@ class EventFactory(Factory):
 
 
 class Detail(object):
-    def __init__(self, eventTime, awsEventType, awsRegion, eventName, userIdentity, id, eventSource, requestParameters):
+    def __init__(self, eventTime, awsEventType, awsRegion, eventName, userIdentity, id, eventSource,
+                 requestParameters, responseElements):
         self.eventTime = eventTime
         self.awsRegion = awsRegion
         self.awsEventType = awsEventType
@@ -184,6 +185,7 @@ class Detail(object):
         self.id = id
         self.eventSource = eventSource
         self.requestParameters = requestParameters
+        self.responseElements = responseElements
         self.eventName = eventName
 
 
@@ -197,6 +199,7 @@ class DetailFactory(Factory):
     id = FuzzyText()
     eventName = ''
     requestParameters = dict()
+    responseElements = dict()
     eventSource = 'aws.ec2'
     awsRegion = 'us-east-1'
 
