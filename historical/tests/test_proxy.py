@@ -1,5 +1,5 @@
 """
-.. module: historical.tests.test_snsproxy
+.. module: historical.tests.test_proxy
     :platform: Unix
     :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.
@@ -7,12 +7,16 @@
 """
 import json
 import math
+import os
 import sys
 import time
 from datetime import datetime
 
+import boto3
+import pytest
 from mock import MagicMock
 
+from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.models import TTL_EXPIRY
 from historical.tests.factories import DynamoDBRecordFactory, DynamoDBDataFactory, DynamoDBRecordsFactory, serialize, \
     CloudwatchEventFactory, DetailFactory, RecordsFactory, SQSDataFactory, SnsDataFactory
@@ -73,8 +77,8 @@ S3_BUCKET = {
 }
 
 
-def test_make_sns_blob():
-    from historical.common.sns import shrink_sns_blob
+def test_make_blob():
+    from historical.common.proxy import shrink_blob
 
     ttl = int(time.time() + TTL_EXPIRY)
     new_bucket = S3_BUCKET.copy()
@@ -91,10 +95,10 @@ def test_make_sns_blob():
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
-    shrunken_blob = shrink_sns_blob(data)
+    shrunken_blob = shrink_blob(data)
 
     assert shrunken_blob['userIdentity'] == data['userIdentity']
-    assert shrunken_blob['sns_too_big']
+    assert shrunken_blob[EVENT_TOO_BIG_FLAG]
     assert shrunken_blob['eventName'] == data['eventName']
     assert shrunken_blob['dynamodb']['Keys'] == data['dynamodb']['Keys']
 
@@ -102,25 +106,16 @@ def test_make_sns_blob():
     assert not shrunken_blob['dynamodb']['OldImage'].get('configuration')
 
 
-def test_process_sns_forward():
-    import historical.common.sns
+def test_make_proper_record():
+    import historical.common.proxy
 
-    test_blob = {'value': None}
-    old_publish_message = historical.common.sns._publish_message
-    old_logger = historical.common.sns.log
-
-    def mock_publish_message(client, blob, topic_arn):
-        assert math.ceil(sys.getsizeof(blob) / 1024) < 256
-
-        # Sort the JSON for easier comparisons later...
-        test_blob['value'] = json.dumps(json.loads(blob), sort_keys=True)
-
-    historical.common.sns._publish_message = mock_publish_message
+    old_publish_message = historical.common.proxy._publish_sns_message
+    old_logger = historical.common.proxy.log
 
     mock_logger = MagicMock()
-    historical.common.sns.log = mock_logger
+    historical.common.proxy.log = mock_logger
 
-    from historical.common.sns import process_sns_forward
+    from historical.common.proxy import make_proper_record
 
     # With a small item:
     ttl = int(time.time() + TTL_EXPIRY)
@@ -139,9 +134,9 @@ def test_process_sns_forward():
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
     # Nothing changed -- should be exactly the same:
-    process_sns_forward(data, "sometopic", None)
-    assert test_blob['value'] == json.dumps(data, sort_keys=True)
-    assert not json.loads(test_blob['value']).get('sns_too_big')
+    test_blob = json.dumps(json.loads(make_proper_record(data)), sort_keys=True)
+    assert test_blob == json.dumps(data, sort_keys=True)
+    assert not json.loads(test_blob).get(EVENT_TOO_BIG_FLAG)
     assert not mock_logger.debug.called
 
     # With a big item...
@@ -158,12 +153,12 @@ def test_process_sns_forward():
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
     assert math.ceil(sys.getsizeof(json.dumps(data)) / 1024) >= 256
-    process_sns_forward(data, "sometopic", None)
-    assert test_blob['value'] != json.dumps(data, sort_keys=True)
-    assert json.loads(test_blob['value'])['sns_too_big']
+    test_blob = json.dumps(json.loads(make_proper_record(data)), sort_keys=True)
+    assert test_blob != json.dumps(data, sort_keys=True)
+    assert json.loads(test_blob)[EVENT_TOO_BIG_FLAG]
     assert not mock_logger.debug.called
 
-    # With a region that is not in the SNSPROXY_REGIONS var:
+    # With a region that is not in the PROXY_REGIONS var:
     new_bucket['Region'] = "us-west-2"
     ddb_record = DynamoDBRecordFactory(
         dynamodb=DynamoDBDataFactory(
@@ -175,24 +170,22 @@ def test_process_sns_forward():
         eventName='INSERT')
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
-    process_sns_forward(data, "sometopic", None)
+    make_proper_record(data)
     assert mock_logger.debug.called
 
     # Unmock:
-    historical.common.sns._publish_message = old_publish_message
-    historical.common.sns.log = old_logger
+    historical.common.proxy._publish_sns_message = old_publish_message
+    historical.common.proxy.log = old_logger
 
 
-def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment,
-                                  buckets):
-    """
-    This mostly checks that the differ is able to properly load the reduced dataset from the SNSProxy.
-    """
+def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment,
+                               buckets):
+    """This mostly checks that the differ is able to properly load the reduced dataset from the Proxy."""
     # Create the item in the current table:
     from historical.s3.collector import handler as current_handler
     from historical.s3.differ import handler as diff_handler
     from historical.s3.models import CurrentS3Model, DurableS3Model
-    from historical.common.sns import shrink_sns_blob
+    from historical.common.proxy import shrink_blob
 
     # Mock out the loggers:
     import historical.common.dynamodb
@@ -250,12 +243,13 @@ def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_
         eventName='INSERT')
 
     # Get the shrunken blob:
-    shrunken_existing = json.dumps(shrink_sns_blob(json.loads(json.dumps(ddb_existing_item, default=serialize))))
-    shrunken_missing = json.dumps(shrink_sns_blob(json.loads(json.dumps(ddb_missing_item, default=serialize))))
+    shrunken_existing = json.dumps(shrink_blob(json.loads(json.dumps(ddb_existing_item, default=serialize))))
+    shrunken_missing = json.dumps(shrink_blob(json.loads(json.dumps(ddb_missing_item, default=serialize))))
 
+    # Also try one without the SNS data factory -- it should stil work properly on de-serialization:
     records = RecordsFactory(
         records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=shrunken_existing), default=serialize)),
-                 SQSDataFactory(body=json.dumps(SnsDataFactory(Message=shrunken_missing), default=serialize))]
+                 SQSDataFactory(body=json.dumps(shrunken_missing, default=serialize))]
     )
     records_event = json.loads(json.dumps(records, default=serialize))
 
@@ -288,3 +282,58 @@ def test_snsproxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_
 
     # Unmock the logger:
     historical.common.dynamodb.log = old_logger
+
+
+def test_proxy_lambda(historical_role, historical_sqs, mock_lambda_environment):
+    import historical.common.proxy
+    from historical.constants import CURRENT_REGION
+    from historical.common.exceptions import MissingProxyConfigurationException
+    from historical.common.proxy import handler
+    from historical.common.util import deserialize_records
+
+    ttl = int(time.time() + TTL_EXPIRY)
+    new_bucket = S3_BUCKET.copy()
+    new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+    new_bucket["ttl"] = ttl
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))
+
+    # First check for failure if none of the environment variables are set:
+    with pytest.raises(MissingProxyConfigurationException):
+        handler(data, mock_lambda_environment)
+
+    # Send messages with SQS:
+    os.environ['PROXY_QUEUE_URL'] = 'proxyqueue'
+    handler(data, mock_lambda_environment)
+
+    # Verify that we got our message:
+    sqs = boto3.client('sqs', region_name=CURRENT_REGION)
+    messages = sqs.receive_message(QueueUrl='proxyqueue', MaxNumberOfMessages=10)['Messages']
+
+    assert len(messages) == 1
+    # 'Body' is lowercase:
+    messages[0]['body'] = messages[0]['Body']
+    records = deserialize_records(messages)
+    assert records[0]['dynamodb']['Keys']['arn']['S'] == new_bucket['arn']
+
+    # Send messages with SNS (need to mock out SNS since it's hard to mock it)
+    mock_func = MagicMock()
+    old_publish = historical.common.proxy._publish_sns_message
+    historical.common.proxy._publish_sns_message = mock_func
+    del os.environ['PROXY_QUEUE_URL']
+
+    os.environ['PROXY_TOPIC_ARN'] = 'thetopic'
+    handler(data, mock_lambda_environment)
+    assert mock_func.called
+
+    # Clean-up:
+    historical.common.proxy._publish_sns_message = old_publish
+    del os.environ['PROXY_TOPIC_ARN']

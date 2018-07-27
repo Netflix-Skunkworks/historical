@@ -10,6 +10,7 @@ import logging
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.dynamodb import process_dynamodb_differ_record
+from historical.common.util import deserialize_records
 from historical.constants import LOGGING_LEVEL
 from historical.vpc.models import DurableVPCModel, CurrentVPCModel
 
@@ -26,5 +27,8 @@ def handler(event, context):
     Listens to the Historical current table and determines if there are differences that need to be persisted in the
     historical record.
     """
-    for record in event['Records']:
+    # De-serialize the records:
+    records = deserialize_records(event['Records'])
+
+    for record in records:
         process_dynamodb_differ_record(record, CurrentVPCModel, DurableVPCModel)
