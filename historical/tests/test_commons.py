@@ -12,6 +12,7 @@ from datetime import datetime
 import pytest
 
 from historical.common.exceptions import DurableItemIsMissingException
+from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.s3.collector import process_update_records
 from historical.tests.factories import CloudwatchEventFactory, DetailFactory, serialize, DynamoDBRecordFactory, \
     DynamoDBDataFactory
@@ -89,7 +90,7 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
     assert result.configuration.attribute_values['Name'] == "testbucket1"
     assert isinstance(result, CurrentS3Model)
 
-    # And for sns_too_big:
+    # And for event_too_big:
     # Create the bucket in the current table:
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
     create_event = json.loads(json.dumps(CloudwatchEventFactory(
@@ -110,7 +111,7 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
             'arn': bucket['arn']
         }),
         eventName='INSERT'), default=serialize))
-    ddb_record['sns_too_big'] = True
+    ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
     assert result.configuration.attribute_values['Name'] == "testbucket1"
@@ -122,7 +123,7 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
             'arn': 'arn:aws:s3:::notarealbucket'
         }),
         eventName='INSERT'), default=serialize))
-    ddb_record['sns_too_big'] = True
+    ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
     assert not result
@@ -148,7 +149,7 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
     assert result.eventTime == bucket['eventTime']
     assert isinstance(result, DurableS3Model)
 
-    # And for sns_too_big:
+    # And for event_too_big:
     # Create the bucket in the durable table:
     ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
         NewImage=bucket, Keys={
@@ -157,7 +158,7 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
         eventName='INSERT'), default=serialize))
     revision = deserialize_current_record_to_durable_model(ddb_record, CurrentS3Model, DurableS3Model)
     revision.save()
-    ddb_record['sns_too_big'] = True
+    ddb_record[EVENT_TOO_BIG_FLAG] = True
     del bucket['configuration']
 
     result = deserialize_durable_record_to_durable_model(ddb_record, DurableS3Model)
@@ -172,7 +173,7 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
             'arn': 'arn:aws:s3:::notarealbucket'
         }),
         eventName='INSERT'), default=serialize))
-    ddb_record['sns_too_big'] = True
+    ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     # Raises an exception:
     with pytest.raises(DurableItemIsMissingException):
@@ -197,7 +198,7 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
     assert result.configuration.attribute_values['Name'] == "testbucket1"
     assert isinstance(result, CurrentS3Model)
 
-    # And for sns_too_big:
+    # And for event_too_big:
     # Create the bucket in the Current table:
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
     create_event = json.loads(json.dumps(CloudwatchEventFactory(
@@ -219,7 +220,7 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
         }),
         eventName='INSERT'), default=serialize))
 
-    ddb_record['sns_too_big'] = True
+    ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
     assert result
@@ -232,7 +233,7 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
             'arn': 'arn:aws:s3:::notarealbucket'
         }),
         eventName='INSERT'), default=serialize))
-    ddb_record['sns_too_big'] = True
+    ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
     assert not result

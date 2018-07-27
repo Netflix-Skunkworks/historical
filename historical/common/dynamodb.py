@@ -13,6 +13,7 @@ from deepdiff import DeepDiff
 from boto3.dynamodb.types import TypeDeserializer
 
 from historical.common.exceptions import DurableItemIsMissingException
+from historical.constants import EVENT_TOO_BIG_FLAG
 
 deser = TypeDeserializer()
 
@@ -173,7 +174,7 @@ def deserialize_current_record_to_durable_model(record, current_model, durable_m
     :return:
     """
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
-    if record.get("sns_too_big"):
+    if record.get(EVENT_TOO_BIG_FLAG):
         record = get_full_current_object(record, current_model)
 
         if not record:
@@ -199,7 +200,7 @@ def deserialize_current_record_to_current_model(record, current_model):
     :return:
     """
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
-    if record.get("sns_too_big"):
+    if record.get(EVENT_TOO_BIG_FLAG):
         record = get_full_current_object(record, current_model)
 
         if not record:
@@ -225,7 +226,7 @@ def deserialize_durable_record_to_durable_model(record, durable_model):
     :return:
     """
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
-    if record.get("sns_too_big"):
+    if record.get(EVENT_TOO_BIG_FLAG):
         record = get_full_durable_object(record, durable_model)
 
         if not record:
@@ -252,7 +253,7 @@ def deserialize_durable_record_to_current_model(record, current_model):
     """
 
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
-    if record.get("sns_too_big"):
+    if record.get(EVENT_TOO_BIG_FLAG):
         # Try to get the data from the current table vs. grabbing the data from the Durable table:
         record = get_full_current_object(record, current_model)
 
@@ -273,13 +274,10 @@ def process_dynamodb_differ_record(record, current_model, durable_model, diff_fu
     """
     Processes a DynamoDB NewImage record (for Differ events).
 
-    This will ONLY process the record if the record exists in one of the regions defined by the SNSPROXY_REGIONS of
-    the current SNSProxy function.
+    This will ONLY process the record if the record exists in one of the regions defined by the PROXY_REGIONS of
+    the current Proxy function.
     """
     diff_func = diff_func or default_diff
-
-    # De-serialize the the record (it's an SNS message inside of an SQS event message):
-    record = json.loads(json.loads(record['body'])['Message'])
 
     # Nothing special needs to be done for deletions as far as items that are too big for SNS are concerned.
     # This is because the deletion will remove the `configuration` field and save the item without it.

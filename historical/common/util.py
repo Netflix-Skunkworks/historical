@@ -18,8 +18,12 @@ def deserialize_records(records):
     for r in records:
         parsed = json.loads(r['body'])
 
-        # Is this from SNS (cross-region request -- SNS messages wrapped in SQS message)?
-        if parsed.get('Type') == 'Notification' and parsed.get('Message'):
+        # Is this a DynamoDB stream event?
+        if isinstance(parsed, str):
+            native_records.append(json.loads(parsed))
+
+        # Is this from SNS (cross-region request -- SNS messages wrapped in SQS message) -- or an SNS proxied message?
+        elif parsed.get('EventSource') == 'aws:sns' and parsed.get('Message'):
             native_records.append(json.loads(parsed['Message']))
 
         else:

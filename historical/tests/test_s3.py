@@ -346,8 +346,7 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
         }),
         eventName='INSERT'), default=serialize)
 
-    new_item = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=ddb_record),
-                                                                      default=serialize))])
+    new_item = RecordsFactory(records=[SQSDataFactory(body=json.dumps(ddb_record, default=serialize))])
     data = json.loads(json.dumps(new_item, default=serialize))
     handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 1
@@ -370,7 +369,7 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
         }
     ), eventName='MODIFY'), default=serialize)
 
-    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(data, default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 1
@@ -387,7 +386,7 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
             'arn': new_changes['arn']
         }
     ), eventName='MODIFY'), default=serialize)
-    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
+    data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(data, default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
     results = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
@@ -395,7 +394,7 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     assert results[1].Tags["ANew"] == results[1].configuration.attribute_values["Tags"]["ANew"] == "Tag"
     assert results[1].eventTime == new_date
 
-    # And deletion (ensure new record -- testing TTL):
+    # And deletion (ensure new record -- testing TTL): -- And with SNS for testing completion
     delete_bucket = S3_BUCKET.copy()
     delete_bucket["eventTime"] = datetime(year=2017, month=5, day=12, hour=12, minute=30, second=0).isoformat() + 'Z'
     delete_bucket["ttl"] = ttl

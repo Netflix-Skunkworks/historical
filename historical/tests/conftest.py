@@ -125,6 +125,9 @@ def historical_sqs():
         client.create_queue(QueueName='eventqueue')
         os.environ['EVENT_QUEUE_NAME'] = 'eventqueue'
 
+        # Proxy Queue:
+        client.create_queue(QueueName='proxyqueue')
+
         yield client
 
 

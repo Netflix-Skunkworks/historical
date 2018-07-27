@@ -9,3 +9,7 @@
 
 class DurableItemIsMissingException(Exception):
     pass
+
+
+class MissingProxyConfigurationException(Exception):
+    pass

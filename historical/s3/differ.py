@@ -11,6 +11,7 @@ from deepdiff import DeepDiff
 
 from raven_python_lambda import RavenLambdaWrapper
 
+from historical.common.util import deserialize_records
 from historical.constants import LOGGING_LEVEL
 from historical.s3.models import DurableS3Model, CurrentS3Model
 from historical.common.dynamodb import process_dynamodb_differ_record
@@ -47,5 +48,8 @@ def handler(event, context):
     Listens to the Historical current table and determines if there are differences that need to be persisted in the
     historical record.
     """
-    for record in event['Records']:
+    # De-serialize the records:
+    records = deserialize_records(event['Records'])
+
+    for record in records:
         process_dynamodb_differ_record(record, CurrentS3Model, DurableS3Model, diff_func=is_new_revision)
