@@ -22,8 +22,12 @@ def deserialize_records(records):
         if isinstance(parsed, str):
             native_records.append(json.loads(parsed))
 
+        # Is this a subscription message from SNS? If so, skip it:
+        elif parsed.get('Message') and parsed.get('UnsubscribeURL'):
+            continue
+
         # Is this from SNS (cross-region request -- SNS messages wrapped in SQS message) -- or an SNS proxied message?
-        elif parsed.get('Message') and (parsed.get('EventSource') == 'aws:sns' or parsed.get('Notification')):
+        elif parsed.get('Message'):
             native_records.append(json.loads(parsed['Message']))
 
         else:
