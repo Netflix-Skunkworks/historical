@@ -71,17 +71,24 @@ def handler(event, context):
     if not queue_url and not topic_arn:
         raise MissingProxyConfigurationException('[X] Must set the `PROXY_QUEUE_URL` or the `PROXY_TOPIC_ARN` vars.')
 
-    items_to_ship = [make_proper_record(record) for record in event['Records']]
+    items_to_ship = []
+    for record in event['Records']:
+        item = make_proper_record(record)
 
-    # SQS:
-    if queue_url:
-        produce_events(items_to_ship, queue_url)
+        # If there are no items, don't append anything:
+        if item:
+            items_to_ship.append(item)
 
-    # SNS:
-    else:
-        client = boto3.client("sns", region_name=CURRENT_REGION)
-        for i in items_to_ship:
-            _publish_sns_message(client, i, topic_arn)
+    if items_to_ship:
+        # SQS:
+        if queue_url:
+            produce_events(items_to_ship, queue_url)
+
+        # SNS:
+        else:
+            client = boto3.client("sns", region_name=CURRENT_REGION)
+            for i in items_to_ship:
+                _publish_sns_message(client, i, topic_arn)
 
 
 def make_proper_record(record):

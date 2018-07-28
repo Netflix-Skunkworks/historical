@@ -170,7 +170,8 @@ def test_make_proper_record():
         eventName='INSERT')
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
-    make_proper_record(data)
+    item = make_proper_record(data)
+    assert not item
     assert mock_logger.debug.called
 
     # Unmock:
@@ -323,6 +324,15 @@ def test_proxy_lambda(historical_role, historical_sqs, mock_lambda_environment):
     messages[0]['body'] = messages[0]['Body']
     records = deserialize_records(messages)
     assert records[0]['dynamodb']['Keys']['arn']['S'] == new_bucket['arn']
+    sqs.delete_message(QueueUrl='proxyqueue', ReceiptHandle=messages[0]['ReceiptHandle'])
+
+    # Nothing should be sent out if the region is different:
+    import historical.common.proxy
+    historical.common.proxy.PROXY_REGIONS = ['eu-west-1']
+    handler(data, mock_lambda_environment)
+    messages = sqs.receive_message(QueueUrl='proxyqueue', MaxNumberOfMessages=10)
+    assert not messages.get('Messages')
+    historical.common.proxy.PROXY_REGIONS = ['us-east-1']
 
     # Send messages with SNS (need to mock out SNS since it's hard to mock it)
     mock_func = MagicMock()
