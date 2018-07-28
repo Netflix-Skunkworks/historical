@@ -82,7 +82,8 @@ def handler(event, context):
     if items_to_ship:
         # SQS:
         if queue_url:
-            produce_events(items_to_ship, queue_url)
+            # Need to reduce batch size to avoid SQS size limitations
+            produce_events(items_to_ship, queue_url, batch_size=5)
 
         # SNS:
         else:

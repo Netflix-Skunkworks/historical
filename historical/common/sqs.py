@@ -40,14 +40,16 @@ def make_sqs_record(event):
     }
 
 
-def produce_events(events, queue_url):
+def produce_events(events, queue_url, batch_size=10):
     """
     Efficiently sends events to the SQS event queue.
+
+    Note: SQS has a max size of 10 items.  Please be aware that this can make the messages go past size -- even
+    with shrinking messages!
     """
     client = boto3.client('sqs', region_name=CURRENT_REGION)
 
-    # SQS has max size of 10 items:
-    for chunk in chunks(events, 10):
+    for chunk in chunks(events, batch_size):
         records = [make_sqs_record(event) for event in chunk]
 
         client.send_message_batch(Entries=records, QueueUrl=queue_url)
