@@ -182,3 +182,6 @@ serverless_configs/*
 
 .DS_Store
 .DS_Store/
+
+### MKDOCS ###
+mkdocs/site/
