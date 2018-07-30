@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Architecture - Historical</title>
+        <link href="../css/bootstrap-custom.min.css" rel="stylesheet">
+        <link href="../css/font-awesome-4.5.0.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link rel="stylesheet" href="../css/highlight.css">
+        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+            <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+        <![endif]-->
+
+        <script src="../js/jquery-1.10.2.min.js"></script>
+        <script src="../js/bootstrap-3.0.3.min.js"></script>
+        <script src="../js/highlight.pack.js"></script> 
+    </head>
+
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+
+        <!-- Collapsed navigation -->
+        <div class="navbar-header">
+            <!-- Expander button -->
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="..">Historical</a>
+        </div>
+
+        <!-- Expanded navigation -->
+        <div class="navbar-collapse collapse">
+                <!-- Main navigation -->
+                <ul class="nav navbar-nav">
+                    <li >
+                        <a href="..">Welcome</a>
+                    </li>
+                    <li class="active">
+                        <a href="./">Architecture</a>
+                    </li>
+                    <li >
+                        <a href="../installation/">Installation and Configuration</a>
+                    </li>
+                </ul>
+
+            <ul class="nav navbar-nav navbar-right">
+                <li>
+                    <a href="#" data-toggle="modal" data-target="#mkdocs_search_modal">
+                        <i class="fa fa-search"></i> Search
+                    </a>
+                </li>
+                    <li >
+                        <a rel="next" href="..">
+                            <i class="fa fa-arrow-left"></i> Previous
+                        </a>
+                    </li>
+                    <li >
+                        <a rel="prev" href="../installation/">
+                            Next <i class="fa fa-arrow-right"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/Netflix-Skunkworks/historical/edit/master/docs/architecture.md"><i class="fa fa-github"></i> Edit on GitHub</a>
+                    </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+        <div class="container">
+                <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
+    <ul class="nav bs-sidenav">
+        <li class="main active"><a href="#historical-architecture">Historical Architecture</a></li>
+            <li><a href="#general-architectural-overview">General Architectural Overview</a></li>
+            <li><a href="#prerequisites">Prerequisites</a></li>
+            <li><a href="#regions">Regions</a></li>
+            <li><a href="#component-overview">Component Overview</a></li>
+            <li><a href="#special-stacks">Special Stacks</a></li>
+            <li><a href="#installation-configuration">Installation &amp; Configuration</a></li>
+    </ul>
+</div></div>
+                <div class="col-md-9" role="main">
+
+<h1 id="historical-architecture">Historical Architecture<a class="headerlink" href="#historical-architecture" title="Permanent link">&para;</a></h1>
+<p>Historical is a serverless application in AWS. It consists of many components and are described in this document.</p>
+<p>Historical is written in Python 3 and heavily leverages AWS technologies such as Lambda, SNS, SQS, DynamoDB, CloudTrail, and CloudWatch.</p>
+<h2 id="general-architectural-overview">General Architectural Overview<a class="headerlink" href="#general-architectural-overview" title="Permanent link">&para;</a></h2>
+<p>Here is a diagram of the Historical Architecture:
+<a href="../img/historical-overview.jpg"><img src="../img/historical-overview.jpg"></a></p>
+<p><strong>Please Note:</strong> This stack is deployed <em>for every technology monitored</em>! There are many, many Historical stacks that will be deployed!</p>
+<h3 id="polling-vs-events">Polling vs. Events<a class="headerlink" href="#polling-vs-events" title="Permanent link">&para;</a></h3>
+<p>Historical is <em>both</em> a polling and event driven system. It will periodically poll AWS accounts for changes. Because Historical responds to events in the environment, polling doesn't need to be very aggressive.</p>
+<p>Unfortunately, events are not 100% reliable, and as such, polling is required to describe items that may have had lost events.</p>
+<p>Historical is <em>eventually consistent</em>, and makes a <em>best effort</em> to maintain a current and up-to-date inventory of assets.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>For all of this to work the following prerequisites that must be satisfied:</p>
+<ol>
+<li><strong>ALL AWS</strong> accounts must be configured to send CloudWatch events over a CloudWatch Event Bus to the Historical AWS account.</li>
+<li><strong>ALL AWS accounts</strong> and <strong>ALL regions</strong> in those accounts need to have a CloudWatch Event rule that captures ALL events and sends them over the Event Bus.</li>
+<li><strong>ALL AWS</strong> accounts must have CloudTrail enabled.</li>
+<li>A <code>Historical</code> IAM role must exist in <strong>ALL AWS</strong> accounts with permissions that are defined <strong>here</strong>*(TODO ADD THESE!). This role must have an <code>AssumeRolePolicyDocument</code> to permit access from the <code>HistoricalLambdaProfile</code> IAM role in the Historical Account.</li>
+<li>Historical makes use of <a href="https://github.com/Netflix-Skunkworks/swag-api">SWAG</a> to define which AWS accounts Historical is enabled for. SWAG must be properly configured for Historical to operate.</li>
+</ol>
+<p>The CloudWatch configuration is outlined here:
+<img alt="CW Event Bus Diagram" src="../img/cw-events.png" /></p>
+<p>The IAM configuration is outlined here:
+TODO ADD ME</p>
+<h2 id="regions">Regions<a class="headerlink" href="#regions" title="Permanent link">&para;</a></h2>
+<p>Historical has the concept of regions that fit 3 categories:</p>
+<ul>
+<li>Primary region</li>
+<li>Secondary region(s)</li>
+<li>Off region(s)</li>
+</ul>
+<p>The <strong>Primary Region</strong> is considered the "Base" of Historical. This region has all the major components that make up Historical. This region is responsible for getting events from ALL the off-regions -- which are regions that don't require a full Historical stack, but would still like to receive events from.</p>
+<p>The <strong>Secondary Region(s)</strong> are regions that are important to you. Secondary regions look like the primary region, and process events locally. If you have a lot of infrastructure in a region, you should place a Historical stack there. This will allow you to quickly receive and process events, and also gives your applications a regionally-local means of accessing Historical data.</p>
+<p>The <strong>Off Region(s)</strong> are regions you don't have a lot of infrastructure deployed in. However, you still want visibility in these regions should events happen there. These regions have very minimal amount of infrastructure deployed. These regions will forward ALL events to the Primary Region for processing.</p>
+<p><strong>Note:</strong> It is highly recommended to have a Historical off-region stack in any region that is not Primary or Secondary. This will ensure full visibility in your environment.</p>
+<h2 id="component-overview">Component Overview<a class="headerlink" href="#component-overview" title="Permanent link">&para;</a></h2>
+<p>This section describes some of the high-level architectural components.</p>
+<h3 id="primary-components">Primary Components<a class="headerlink" href="#primary-components" title="Permanent link">&para;</a></h3>
+<p>Below are the primary components of the Historical architecture:</p>
+<ol>
+<li>CloudWatch Event Rules</li>
+<li>CloudWatch Change Events</li>
+<li>Poller</li>
+<li>Collector</li>
+<li>Current Table</li>
+<li>DynamoDB Stream Proxy</li>
+<li>Differ</li>
+<li>Durable Table</li>
+<li>Off-region SNS forwarders</li>
+</ol>
+<p>As general overview, the infrastructure follows a pipeline from start to finish. An event will arrive, will get enriched with additional information, and will provide notifications to downstream infrastructure on the given changes.</p>
+<p>SQS queues are used in as many places as possible to trigger Lambda functions. SQS makes it easy to provide Lambda execution concurrency, with retry on failure as well as dead-letter queuing capabilities.</p>
+<p>SNS topics are used to make it easy for <em>N</em> number of interested parties to subscribe to the Historical DynamoDB tables as they become updated. Presently, this is only attached to the Durable table. More details on this below.</p>
+<h3 id="cloudwatch-event-rules">CloudWatch Event Rules<a class="headerlink" href="#cloudwatch-event-rules" title="Permanent link">&para;</a></h3>
+<p>There are two different CloudWatch Event Rules:</p>
+<ol>
+<li>Timed Events</li>
+<li>Change Events</li>
+</ol>
+<p>Timed events are used to kick off the Poller. See the section on the poller below for additional details. Change events are events that arrive from an asset in the AWS environment undergoing a change.</p>
+<h3 id="poller">Poller<a class="headerlink" href="#poller" title="Permanent link">&para;</a></h3>
+<p>The Poller's primary function is to obtain a full inventory of AWS assets.</p>
+<p>The Poller is split into two parts:</p>
+<ol>
+<li>Poller Tasker</li>
+<li>Poller</li>
+</ol>
+<p>The "Poller Tasker" is a Lambda function that iterates over all AWS accounts Historical is configured for, and will task the Poller to <em>list</em> all assets in the given environment.</p>
+<p>The Poller Tasker in the <em>PRIMARY REGION</em> will task the Poller to list assets that reside in the primary region and all off-regions. A Poller Tasker in a <em>SECONDARY REGION</em> will only task a poller to describe assets that reside in the same region.</p>
+<p>The Poller <em>lists</em> all assets in a given account/region, and will task a "Poller Collector" to fetch details about the asset in question.</p>
+<h3 id="collector">Collector<a class="headerlink" href="#collector" title="Permanent link">&para;</a></h3>
+<p>The Collector's primary function is to describe a given AWS asset and store its configuration to the "Current" DynamoDB table.</p>
+<p>The Collector is split into two parts (same code, different execution triggers):</p>
+<ol>
+<li>Poller Collector</li>
+<li>Event Collector</li>
+</ol>
+<p>The Poller Collector is a collector that will only respond to polling events. The Event Collector will only respond to CloudWatch change events.</p>
+<p>The Collector is split into two parts in order to prevent change events from being sandwiched in between polling events. Historical will always try to give priority to change events over polling events to ensure timeliness of asset configuration changes.</p>
+<p>In both cases, the Collector will go to the AWS account and region that the item resides in, and use <code>boto3</code> to describe the configuration of the asset.</p>
+<h3 id="current-table">Current Table<a class="headerlink" href="#current-table" title="Permanent link">&para;</a></h3>
+<p>The "Current" table is a global DynamoDB table that stores the current configuration of a given asset in
+AWS.</p>
+<p>This acts as a cache for current the state of the environment.</p>
+<p>The Current table has as DynamoDB stream that will kick off the DynamoDB Stream Proxy, which will then trigger the Differ.</p>
+<h4 id="special-note">Special Note:<a class="headerlink" href="#special-note" title="Permanent link">&para;</a></h4>
+<p>The Current table has a TTL set on all items. This TTL is updated any time a change event arrives, or when the poller runs. The TTL is set to clean-up orphaned items, which can happen if a deletion event is lost. Deleted items will not be picked up by the Poller (only lists items that exist in the account) and thus, will be removed from the Current table on TTL expiration.</p>
+<h3 id="dynamodb-stream-proxy">DynamoDB Stream Proxy<a class="headerlink" href="#dynamodb-stream-proxy" title="Permanent link">&para;</a></h3>
+<p>The DynamoDB Stream Proxy is a Lambda function that proxies DynamoDB stream events to SNS or SQS. The purpose is to task subsequent Lambda functions on the specific changes that happen to the DynamoDB table.</p>
+<p>The Historical infrastructure has two configurations for the DynamoDB forwarder:</p>
+<ol>
+<li>Current Table Forwarder (DynamoDB Stream Proxy to Differ SQS)</li>
+<li>Durable Table Forwarder (DynamoDB Stream Proxy to Change Notification SNS)</li>
+</ol>
+<p>The Current Table Forwarder proxies events to the SQS queue that triggers the Differ Lambda function. This is sent to SQS to speed up the time to trigger the Differ. SNS lacks a batch message sending API, and thus sending to SNS is slower as a result.</p>
+<p>The Durable Table Forwarder proxies events to an SNS topic that any downstream subscriber for effective infrastructure changes can react to. SNS enables <em>N</em> subscribers to events.</p>
+<h4 id="special-note_1">Special Note:<a class="headerlink" href="#special-note_1" title="Permanent link">&para;</a></h4>
+<p>DynamoDB Streams in Global DynamoDB tables triggers this Lambda whenever a DynamoDB update occurs in ANY of the regions the table is configured to sync with. Thus, to avoid Historical Lambda functions from "stepping on each other's toes", the DynamoDB Stream Proxy has a <code>PROXY_REGIONS</code> environment variable. This variable (a comma-separated list of AWS regions) is configured to only proxy DynamoDB stream updates that occur to assets that are configured. The <em>PRIMARY REGION</em> will be configured to proxy events that occur in the primary region, and all off-regions. The <em>SECONDARY REGION(S)</em> will be configured to proxy events that occur in the same region.</p>
+<h4 id="another-special-note">Another Special Note:<a class="headerlink" href="#another-special-note" title="Permanent link">&para;</a></h4>
+<p>DynamoDB items are capped to 400KB. SNS and SQS have maximum message sizes of 256KB. Logic exists to handle cases where DynamoDB items are too big to send over to SNS/SQS. Follow-up Lambdas and subscribers will need to make use of the Historical API to fetch the full configuration of the item either out of the Current or Durable tables (depending on the use case).</p>
+<h3 id="differ">Differ<a class="headerlink" href="#differ" title="Permanent link">&para;</a></h3>
+<p>The Differ is a Lambda function that gets triggered upon changes to the Current table. The Differ will check if the asset in question has had an effective change. If so, the Differ will save a new change record in the Durable table to maintain history of the asset as it changes over time, and will also save the CloudTrail context, including the time at which the event occurred.</p>
+<h3 id="durable-table">Durable Table<a class="headerlink" href="#durable-table" title="Permanent link">&para;</a></h3>
+<p>The "Durable" table is a global DynamoDB table that stores an asset configuration with change history.</p>
+<p>The Durable table has as DynamoDB stream that will kick off another DynamoDB Stream Proxy, which will be used for interested parties to react to effective changes that occur in the environment.</p>
+<h3 id="off-region-sns-forwarders">Off-Region SNS Forwarders<a class="headerlink" href="#off-region-sns-forwarders" title="Permanent link">&para;</a></h3>
+<p>In off-regions, very bare infrastructure is intentionally deployed. This helps to reduce costs and complexity of the Historical infrastructure.</p>
+<p>This is a SNS Topic that receives CloudWatch events for asset changes that occur in region. This topic  forwards events to the Event Collector SQS queue in the primary region.</p>
+<h2 id="special-stacks">Special Stacks<a class="headerlink" href="#special-stacks" title="Permanent link">&para;</a></h2>
+<p>Some asset types have different stack configurations due to nuances of the technology.</p>
+<p>The following technologies have different stack types:</p>
+<ul>
+<li>S3</li>
+</ul>
+<h3 id="s3">S3<a class="headerlink" href="#s3" title="Permanent link">&para;</a></h3>
+<p>The AWS S3 stack is almost identical to the standard stack. The difference is due to AWS S3 buckets having a globally unique namespace.</p>
+<p>For S3, because it is not presently possible to only poll for in-region S3 buckets, the poller lives in the primary region only. The poller in the primary region polls for all S3 buckets in all regions.</p>
+<p>The secondary regions will still respond to in-region events, but lack all polling components.</p>
+<p><a href="../img/historical-s3.jpg">This diagram showcases the S3 stack.</a></p>
+<h2 id="installation-configuration">Installation &amp; Configuration<a class="headerlink" href="#installation-configuration" title="Permanent link">&para;</a></h2>
+<p>Please refer to the installation docs for additional details.</p></div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="http://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script>var base_url = '..';</script>
+        <script src="../js/base.js"></script>
+        <script src="../search/require.js"></script>
+        <script src="../search/search.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="Search Modal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="exampleModalLabel">Search</h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    From here you can search these documents. Enter
+                    your search terms below.
+                </p>
+                <form role="form">
+                    <div class="form-group">
+                        <input type="text" class="form-control" placeholder="Search..." id="mkdocs-search-query">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="Keyboard Shortcuts Modal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="exampleModalLabel">Keyboard Shortcuts</h4>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td><kbd>&larr;</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td><kbd>&rarr;</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    </body>
+</html>
