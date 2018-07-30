@@ -1,0 +1,16 @@
+site_name: Historical
+repo_url: https://github.com/Netflix-Skunkworks/historical
+repo_name: GitHub
+pages:
+  - Welcome: index.md
+  - Architecture: architecture.md
+  - Installation and Configuration: installation.md
+theme:
+  name: yeti
+
+# There are many available formatting extensions available, please read:
+# https://facelessuser.github.io/pymdown-extensions/
+markdown_extensions:
+  - toc:
+      permalink: True
+  - pymdownx.tilde

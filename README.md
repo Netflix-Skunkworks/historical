@@ -5,32 +5,6 @@
 
 ## Historical is under heavy development and is not ready for production use.
 
-# Historical
+Please review the documentation that is hosted here: [https://netflix-skunkworks.github.io/historical](https://netflix-skunkworks.github.io/).
 
-Historical is a AWS configuration collection service. It uses a combination of Cloudwatch Events (CWE) and periodic polling to gather
-and store configuration data from multiple accounts.
-
-Key Features:
-
-- Real-time
-- Multi-account
-- Serverless architecture
-- Region isolation
-
-#### Supported Technologies
-
-| Service Name | Development Status |
-| ------------ | ------------------ |
-| iam.roles    | In-progress        |
-| ec2.security_groups | Complete ✅ |
-| ec2.vpc | Complete ✅ |
-| ec2.elb | In-progress |
-| s3           | Complete ✅       |
-| route53      | In-progress        |
-
-## Documentation
-We are actively working on documentation for Historical. We will update this soon with the details!
-
-Below is a diagram of the Historical architecture:
-![Historical Architecture](docs/images/historical-overview.jpg "Historical Architecture Overview")
-
+[![Historical Logo](mkdocs/docs/img/historical.jpg)](https://netflix-skunkworks.github.io/)
