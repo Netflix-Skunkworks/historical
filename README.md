@@ -5,6 +5,6 @@
 
 ## Historical is under heavy development and is not ready for production use.
 
-Please review the documentation that is hosted here: [https://netflix-skunkworks.github.io/historical](https://netflix-skunkworks.github.io/).
+Please review the documentation that is hosted here: [https://netflix-skunkworks.github.io/historical](https://netflix-skunkworks.github.io/historical).
 
-[![Historical Logo](mkdocs/docs/img/historical.jpg)](https://netflix-skunkworks.github.io/)
+[![Historical Logo](mkdocs/docs/img/historical.jpg)](https://netflix-skunkworks.github.io/historical)
