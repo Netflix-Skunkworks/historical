@@ -31,7 +31,8 @@ def _publish_sns_message(client, blob, topic_arn):
 def shrink_blob(record):
     """
     Makes a shrunken blob to be sent to SNS/SQS (due to the 256KB size limitations of SNS/SQS messages).
-    This will essentially remove the "configuration" field such that the size of the SNS/SQS message remains under 256KB.
+    This will essentially remove the "configuration" field such that the size of the SNS/SQS message remains under
+    256KB.
     :param record:
     :return:
     """
@@ -72,8 +73,12 @@ def handler(event, context):
         raise MissingProxyConfigurationException('[X] Must set the `PROXY_QUEUE_URL` or the `PROXY_TOPIC_ARN` vars.')
 
     items_to_ship = []
+
+    # Must ALWAYS shrink for SQS because of 256KB limit of sending batched messages
+    force_shrink = True if queue_url else False
+
     for record in event['Records']:
-        item = make_proper_record(record)
+        item = make_proper_record(record, force_shrink=force_shrink)
 
         # If there are no items, don't append anything:
         if item:
@@ -82,8 +87,7 @@ def handler(event, context):
     if items_to_ship:
         # SQS:
         if queue_url:
-            # Need to reduce batch size to avoid SQS size limitations
-            produce_events(items_to_ship, queue_url, batch_size=5)
+            produce_events(items_to_ship, queue_url)
 
         # SNS:
         else:
@@ -92,10 +96,11 @@ def handler(event, context):
                 _publish_sns_message(client, i, topic_arn)
 
 
-def make_proper_record(record):
+def make_proper_record(record, force_shrink=False):
     """Prepares and ships an individual record over to SNS/SQS for future processing.
 
     :param record:
+    :param force_shrink:
     :return:
     """
     # We should NOT be processing this if the item in question does not
@@ -110,7 +115,7 @@ def make_proper_record(record):
     blob = json.dumps(record)
 
     size = math.ceil(sys.getsizeof(blob) / 1024)
-    if size >= 256:
+    if size >= 200 or force_shrink:
         # Need to send over a smaller blob to inform the recipient that it needs to go out and
         # fetch the item from the Historical table!
         blob = json.dumps(shrink_blob(record))
