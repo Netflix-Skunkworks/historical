@@ -152,7 +152,7 @@ def test_make_proper_record():
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
-    assert math.ceil(sys.getsizeof(json.dumps(data)) / 1024) >= 256
+    assert math.ceil(sys.getsizeof(json.dumps(data)) / 1024) >= 200
     test_blob = json.dumps(json.loads(make_proper_record(data)), sort_keys=True)
     assert test_blob != json.dumps(data, sort_keys=True)
     assert json.loads(test_blob)[EVENT_TOO_BIG_FLAG]
