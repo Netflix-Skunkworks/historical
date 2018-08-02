@@ -6,10 +6,13 @@
 .. author:: Mike Grima <mgrima@netflix.com>
 """
 import json
+import os
 
 from datetime import datetime
 
 import pytest
+from swag_client.backend import SWAGManager
+from swag_client.util import parse_swag_config_options
 
 from historical.common.exceptions import DurableItemIsMissingException
 from historical.constants import EVENT_TOO_BIG_FLAG
@@ -237,3 +240,77 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
     assert not result
+
+
+def test_get_only_test_accounts(swag_accounts):
+    from historical.common.accounts import get_historical_accounts
+
+    # Setup:
+    bucket_name = 'SWAG'
+    data_file = 'accounts.json'
+    region = 'us-east-1'
+    owner = 'third-party'
+
+    os.environ['SWAG_BUCKET'] = bucket_name
+    os.environ['SWAG_DATA_FILE'] = data_file
+    os.environ['SWAG_REGION'] = region
+    os.environ['SWAG_OWNER'] = owner
+
+    swag_opts = {
+        'swag.type': 's3',
+        'swag.bucket_name': bucket_name,
+        'swag.data_file': data_file,
+        'swag.region': region,
+        'swag.cache_expires': 0
+    }
+
+    swag = SWAGManager(**parse_swag_config_options(swag_opts))
+
+    # Production account:
+    account = {
+        'aliases': ['prod'],
+        'contacts': ['admins@prod.net'],
+        'description': 'LOL, PROD account',
+        'email': 'prodaccount@test.net',
+        'environment': 'prod',
+        'id': '999999999999',
+        'name': 'prodaccount',
+        'owner': 'third-party',
+        'provider': 'aws',
+        'sensitive': False,
+        'services': [
+            {
+                'name': 'historical',
+                'status': [
+                    {
+                        'region': 'all',
+                        'enabled': True
+                    }
+                ]
+            }
+        ]
+    }
+    swag.create(account)
+
+    # Get all the swag accounts:
+    result = get_historical_accounts()
+    assert len(result) == 2
+
+    assert result[1]['environment'] == 'prod'
+    assert result[1]['id'] == '999999999999'
+
+    # Only test accounts:
+    os.environ['TEST_ACCOUNTS_ONLY'] = 'True'
+    result = get_historical_accounts()
+    assert len(result) == 1
+    assert result[0]['environment'] == 'test'
+    assert result[0]['id'] != '999999999999'
+
+    # Test the boolean logic:
+    os.environ['TEST_ACCOUNTS_ONLY'] = ''
+    result = get_historical_accounts()
+    assert len(result) == 2
+
+    os.environ['TEST_ACCOUNTS_ONLY'] = 'false'
+    result = get_historical_accounts()
+    assert len(result) == 2

@@ -4,11 +4,23 @@
     :copyright: (c) 2018 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
+.. author:: Mike Grima <mgrima@netflix.com>
 """
 import os
 
 from swag_client.backend import SWAGManager
 from swag_client.util import parse_swag_config_options
+
+
+def parse_boolean(value):
+    """Simple function to get a boolean value from string."""
+    if not value:
+        return False
+
+    if str(value).lower() == 'true':
+        return True
+
+    return False
 
 
 def get_historical_accounts():
@@ -21,9 +33,13 @@ def get_historical_accounts():
             'swag.region': os.environ.get('SWAG_REGION', 'us-east-1')
         }
         swag = SWAGManager(**parse_swag_config_options(swag_opts))
-        accounts = swag.get_service_enabled('historical', search_filter="[?provider=='aws'] && [?owner=='{}']".format(os.environ['SWAG_OWNER']))
+        search_filter = "[?provider=='aws'] && [?owner=='{}']".format(os.environ['SWAG_OWNER'])
+
+        if parse_boolean(os.environ.get('TEST_ACCOUNTS_ONLY')):
+            search_filter += " && [?environment=='test']"
+
+        accounts = swag.get_service_enabled('historical', search_filter=search_filter)
     else:
         accounts = os.environ['ENABLED_ACCOUNTS']
 
     return accounts
-
