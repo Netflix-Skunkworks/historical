@@ -7,6 +7,7 @@
 """
 import logging
 import uuid
+import random
 
 import boto3
 
@@ -31,26 +32,42 @@ def get_queue_url(queue_name):
     return queue["QueueUrl"]
 
 
-def make_sqs_record(event):
+def make_sqs_record(event, delay_seconds=0):
     """Get a dict with the components required for SQS"""
     return {
         "Id": uuid.uuid4().hex,
-        "DelaySeconds": 0,
+        "DelaySeconds": delay_seconds,
         "MessageBody": event
     }
 
 
-def produce_events(events, queue_url, batch_size=10):
+def get_random_delay(max):
+    """Gets a randomized number between 0 and the max number in seconds for
+       how long a message in SQS should be delayed.
+
+       900 seconds (15 min) is the maximum permitted by SQS.
+    :return:
+    """
+    return random.randint(0, max)
+
+
+def produce_events(events, queue_url, batch_size=10, randomize_delay=0):
     """
     Efficiently sends events to the SQS event queue.
 
     Note: SQS has a max size of 10 items.  Please be aware that this can make the messages go past size -- even
     with shrinking messages!
+
+    Events can get randomized delays, maximum of 900 seconds. Set that in `randomize_delay`
+    :param events:
+    :param queue_url:
+    :param batch_size:
+    :param randomize_delay:
     """
     client = boto3.client('sqs', region_name=CURRENT_REGION)
 
     for chunk in chunks(events, batch_size):
-        records = [make_sqs_record(event) for event in chunk]
+        records = [make_sqs_record(event, delay_seconds=get_random_delay(randomize_delay)) for event in chunk]
 
         client.send_message_batch(Entries=records, QueueUrl=queue_url)
 

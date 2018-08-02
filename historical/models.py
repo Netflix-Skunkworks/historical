@@ -12,13 +12,11 @@ from datetime import datetime
 from marshmallow import Schema, fields
 from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
 
+from historical.constants import TTL_EXPIRY
 from historical.attributes import EventTimeAttribute
 
 
-TTL_EXPIRY = 86400  # 24 Hours in seconds
-
-EPHEMERAL_PATHS = [
-]
+EPHEMERAL_PATHS = []
 
 
 def default_ttl():

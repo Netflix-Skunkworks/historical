@@ -15,7 +15,7 @@ from cloudaux.aws.ec2 import describe_security_groups
 
 from historical.common.sqs import get_queue_url, produce_events
 from historical.common.util import deserialize_records
-from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL
+from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL, RANDOMIZE_POLLER
 from historical.models import HistoricalPollerTaskEventModel
 from historical.security_group.models import security_group_polling_schema
 from historical.common.accounts import get_historical_accounts
@@ -49,7 +49,7 @@ def poller_tasker_handler(event, context):
             events.append(poller_task_schema.serialize_me(account['id'], region))
 
     try:
-        produce_events(events, queue_url)
+        produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
     except ClientError as e:
         log.error('[X] Unable to generate poller tasker events! Reason: {reason}'.format(reason=e))
 
@@ -80,7 +80,7 @@ def poller_processor_handler(event, context):
                 region=record['region']
             )
             events = [security_group_polling_schema.serialize(record['account_id'], g) for g in groups['SecurityGroups']]
-            produce_events(events, queue_url)
+            produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
 
             log.debug('[@] Finished generating polling events. Account: {}/{} '
                       'Events Created: {}'.format(record['account_id'], record['region'], len(events)))

@@ -22,6 +22,12 @@ def extract_log_level_from_environment(k, default):
     return log_levels.get(os.environ.get(k)) or int(os.environ.get(k, default))
 
 
+# 24 hours in seconds is the default
+TTL_EXPIRY = int(os.environ.get('TTL_EXPIRY', 86400))
+
+# By default, don't randomize the pollers (tasker or collector -- same env var):
+RANDOMIZE_POLLER = int(os.environ.get('RANDOMIZE_POLLER', 0))
+
 CURRENT_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 HISTORICAL_ROLE = os.environ.get('HISTORICAL_ROLE', 'Historical')
 POLL_REGIONS = os.environ.get('POLL_REGIONS', 'us-east-1').split(",")

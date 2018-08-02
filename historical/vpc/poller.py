@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_vpcs
 
-from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL
+from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL, RANDOMIZE_POLLER
 from historical.common.util import deserialize_records
 from historical.vpc.models import vpc_polling_schema
 from historical.models import HistoricalPollerTaskEventModel
@@ -50,7 +50,7 @@ def poller_tasker_handler(event, context):
             events.append(poller_task_schema.serialize_me(account['id'], region))
 
     try:
-        produce_events(events, queue_url)
+        produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
     except ClientError as e:
         log.error('[X] Unable to generate poller tasker events! Reason: {reason}'.format(reason=e))
 
@@ -82,7 +82,7 @@ def poller_processor_handler(event, context):
             )
 
             events = [vpc_polling_schema.serialize(record['account_id'], v) for v in vpcs]
-            produce_events(events, queue_url)
+            produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
             log.debug('[@] Finished generating polling events. Account: {}/{} '
                       'Events Created: {}'.format(record['account_id'], record['region'], len(events)))
         except ClientError as e:
