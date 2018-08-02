@@ -84,4 +84,5 @@ def poller_processor_handler(event, context):
             log.error('[X] Unable to generate events for account. Account Id: {account_id} Reason: {reason}'.format(
                 account_id=record['account_id'], reason=e))
 
-        log.debug('[@] Finished generating polling events. Events Created: {}'.format(len(record['account_id'])))
+        log.debug('[@] Finished generating polling events for account: {}. Events Created: {}'.format(
+            record['account_id'], len(record['account_id'])))
