@@ -16,7 +16,7 @@ from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.sqs import get_queue_url, produce_events
 from historical.common.util import deserialize_records
-from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL, RANDOMIZE_POLLER
 from historical.models import HistoricalPollerTaskEventModel
 from historical.s3.models import s3_polling_schema
 from historical.common.accounts import get_historical_accounts
@@ -47,7 +47,7 @@ def poller_tasker_handler(event, context):
     events = [poller_task_schema.serialize_me(account['id'], CURRENT_REGION) for account in get_historical_accounts()]
 
     try:
-        produce_events(events, queue_url)
+        produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
     except ClientError as e:
         log.error('[X] Unable to generate poller tasker events! Reason: {reason}'.format(reason=e))
 
@@ -79,7 +79,7 @@ def poller_processor_handler(event, context):
                                        region=record['region'])["Buckets"]
 
             events = [s3_polling_schema.serialize_me(record['account_id'], bucket) for bucket in all_buckets]
-            produce_events(events, queue_url)
+            produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
         except ClientError as e:
             log.error('[X] Unable to generate events for account. Account Id: {account_id} Reason: {reason}'.format(
                 account_id=record['account_id'], reason=e))

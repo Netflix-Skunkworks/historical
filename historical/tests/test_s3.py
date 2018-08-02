@@ -225,7 +225,7 @@ def test_poller_processor_handler(historical_role, buckets, mock_lambda_environm
     # Check that an exception raised doesn't break things:
     import historical.s3.poller
 
-    def mocked_poller(account, stream):
+    def mocked_poller(account, stream, randomize_delay=0):
         raise ClientError({"Error": {"Message": "", "Code": "AccessDenied"}}, "sts:AssumeRole")
 
     old_method = historical.s3.poller.produce_events  # For pytest inter-test issues...
