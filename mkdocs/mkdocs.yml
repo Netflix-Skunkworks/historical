@@ -7,6 +7,8 @@ pages:
   - Installation and Configuration: installation.md
 theme:
   name: yeti
+extra_css:
+  - extra.css
 
 # There are many available formatting extensions available, please read:
 # https://facelessuser.github.io/pymdown-extensions/
