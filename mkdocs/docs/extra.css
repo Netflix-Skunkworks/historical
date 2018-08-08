@@ -2,7 +2,6 @@
     background-color: #00526E
 }
 
-
 .navbar-default .navbar-nav>.active>a, .navbar-default .navbar-nav>.active>a:hover, .navbar-default .navbar-nav>.active>a:focus {
     background-color: #32748B
 }
@@ -20,5 +19,3 @@ h1, h2, h3, h4, h5, h6 {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-weight: 500;
 }
-
-
