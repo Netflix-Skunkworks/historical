@@ -10,6 +10,7 @@ import os
 import pytest
 
 import boto3
+from mock import patch
 from moto import mock_sqs
 
 from moto.dynamodb2 import mock_dynamodb2
@@ -50,7 +51,21 @@ def dynamodb():
 
 
 @pytest.fixture(scope='function')
-def swag_accounts(s3):
+def retry():
+    # Mock the retry:
+    def mock_retry_decorator(*args, **kwargs):
+        def retry(func):
+            return func
+        return retry
+
+    p = patch('retrying.retry', mock_retry_decorator)
+    yield p.start()
+
+    p.stop()
+
+
+@pytest.fixture(scope='function')
+def swag_accounts(s3, retry):
     from swag_client.backend import SWAGManager
     from swag_client.util import parse_swag_config_options
 
