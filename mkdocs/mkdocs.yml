@@ -7,6 +7,7 @@ pages:
   - Installation and Configuration: installation.md
 theme:
   name: yeti
+  custom_dir: custom_theme/
 extra_css:
   - extra.css
 
