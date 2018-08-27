@@ -152,21 +152,21 @@ def capture_update_records(records):
 
         group = group[0]
 
-        # determine event data for group
+        # Determine event data for group - and pop off items that are going to the top-level:
         log.debug('Processing group. Group: {}'.format(group))
         data.update({
             'GroupId': group['GroupId'],
-            'GroupName': group['GroupName'],
-            'Description': group['Description'],
-            'VpcId': group.get('VpcId'),
-            'Tags': group.get('Tags', []),
-            'arn': get_arn(group['GroupId'], group['OwnerId']),
-            'OwnerId': group['OwnerId'],
-            'configuration': group,
+            'GroupName': group.pop('GroupName'),
+            'VpcId': group.pop('VpcId', None),
+            'Tags': group.pop('Tags', []),
+            'arn': get_arn(group.pop('GroupId'), group.pop('OwnerId')),
             'Region': cloudwatch.get_region(record)
         })
 
-        log.debug('Writing Dynamodb Record. Records: {record}'.format(record=data))
+        # Set the remaining items to the configuration:
+        data['configuration'] = group
+
+        log.debug('[+] Writing Dynamodb Record. Records: {record}'.format(record=data))
 
         current_revision = CurrentSecurityGroupModel(**data)
         current_revision.save()

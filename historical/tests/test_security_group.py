@@ -31,13 +31,9 @@ SECURITY_GROUP = {
     'eventSource': 'aws.ec2',
     'VpcId': 'vpc-123343',
     'accountId': '123456789012',
-    'OwnerId': '123456789012',
-    'Description': 'This is a test',
     'Region': 'us-east-1',
     'Tags': [{'Name': 'test', 'Value': '<empty>'}],
     'configuration': {
-        'Description': 'string',
-        'GroupName': 'string',
         'IpPermissions': [
             {
                 'FromPort': 123,
@@ -70,8 +66,6 @@ SECURITY_GROUP = {
                 ]
             },
         ],
-        'OwnerId': 'string',
-        'GroupId': 'string',
         'IpPermissionsEgress': [
             {
                 'FromPort': 123,
@@ -103,14 +97,7 @@ SECURITY_GROUP = {
                     },
                 ]
             },
-        ],
-        'Tags': [
-            {
-                'Key': 'string',
-                'Value': 'string'
-            },
-        ],
-        'VpcId': 'string'
+        ]
     }
 }
 
