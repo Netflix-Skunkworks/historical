@@ -25,36 +25,36 @@ log.setLevel(LOGGING_LEVEL)
 
 
 UPDATE_EVENTS = [
-    "DescribeBucket",   # Polling event
-    "DeleteBucketCors",
-    "DeleteBucketLifecycle",
-    "DeleteBucketPolicy",
-    "DeleteBucketReplication",
-    "DeleteBucketTagging",
-    "DeleteBucketWebsite",
-    "CreateBucket",
-    "PutBucketAcl",
-    "PutBucketCors",
-    "PutBucketLifecycle",
-    "PutBucketPolicy",
-    "PutBucketLogging",
-    "PutBucketNotification",
-    "PutBucketReplication",
-    "PutBucketTagging",
-    "PutBucketRequestPayment",
-    "PutBucketVersioning",
-    "PutBucketWebsite"
+    'DescribeBucket',   # Polling event
+    'DeleteBucketCors',
+    'DeleteBucketLifecycle',
+    'DeleteBucketPolicy',
+    'DeleteBucketReplication',
+    'DeleteBucketTagging',
+    'DeleteBucketWebsite',
+    'CreateBucket',
+    'PutBucketAcl',
+    'PutBucketCors',
+    'PutBucketLifecycle',
+    'PutBucketPolicy',
+    'PutBucketLogging',
+    'PutBucketNotification',
+    'PutBucketReplication',
+    'PutBucketTagging',
+    'PutBucketRequestPayment',
+    'PutBucketVersioning',
+    'PutBucketWebsite'
 ]
 
 
 DELETE_EVENTS = [
-    "DeleteBucket",
+    'DeleteBucket',
 ]
 
 
 def create_delete_model(record):
     """Create an S3 model from a record."""
-    arn = "arn:aws:s3:::{}".format(cloudwatch.filter_request_parameters('bucketName', record))
+    arn = 'arn:aws:s3:::{}'.format(cloudwatch.filter_request_parameters('bucketName', record))
     log.debug('[-] Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
 
     data = {
@@ -67,7 +67,7 @@ def create_delete_model(record):
         'Region': cloudwatch.get_region(record),
         'Tags': {},
         'configuration': {},
-        'eventSource': record["detail"]["eventSource"]
+        'eventSource': record['detail']['eventSource']
     }
 
     return CurrentS3Model(**data)
@@ -76,7 +76,7 @@ def create_delete_model(record):
 def process_delete_records(delete_records):
     """Process the requests for S3 bucket deletions"""
     for r in delete_records:
-        arn = "arn:aws:s3:::{}".format(r['detail']['requestParameters']['bucketName'])
+        arn = 'arn:aws:s3:::{}'.format(r['detail']['requestParameters']['bucketName'])
 
         # Need to check if the event is NEWER than the previous event in case
         # events are out of order. This could *possibly* happen if something
@@ -85,9 +85,9 @@ def process_delete_records(delete_records):
         # if the current event timestamp is newer and will only delete if the deletion
         # event is newer.
         try:
-            log.debug("[-] Deleting bucket: {}".format(arn))
+            log.debug('[-] Deleting bucket: {}'.format(arn))
             model = create_delete_model(r)
-            model.save(condition=(CurrentS3Model.eventTime <= r["detail"]["eventTime"]))
+            model.save(condition=(CurrentS3Model.eventTime <= r['detail']['eventTime']))
             model.delete()
 
         except PynamoDBConnectionError as pdce:
@@ -107,67 +107,65 @@ def process_update_records(update_records):
         buckets = {}
         for e in events:
             # If the creation date is present, then use it:
-            bucket_event = buckets.get(e["detail"]["requestParameters"]["bucketName"], {
-                "creationDate": e["detail"]["requestParameters"].get("creationDate")
+            bucket_event = buckets.get(e['detail']['requestParameters']['bucketName'], {
+                'creationDate': e['detail']['requestParameters'].get('creationDate')
             })
-            bucket_event.update(e["detail"]["requestParameters"])
+            bucket_event.update(e['detail']['requestParameters'])
 
-            buckets[e["detail"]["requestParameters"]["bucketName"]] = bucket_event
-            buckets[e["detail"]["requestParameters"]["bucketName"]]["eventDetails"] = e
+            buckets[e['detail']['requestParameters']['bucketName']] = bucket_event
+            buckets[e['detail']['requestParameters']['bucketName']]['eventDetails'] = e
 
         # Query AWS for current configuration
         for b, item in buckets.items():
-            log.debug("[~] Processing Create/Update for: {}".format(b))
+            log.debug('[~] Processing Create/Update for: {}'.format(b))
             # If the bucket does not exist, then simply drop the request --
             # If this happens, there is likely a Delete event that has occurred and will be processed soon.
             try:
                 bucket_details = get_bucket(b,
                                             account_number=account_id,
-                                            include_created=(item.get("creationDate") is None),
+                                            include_created=(item.get('creationDate') is None),
                                             assume_role=HISTORICAL_ROLE,
                                             region=CURRENT_REGION)
-                if bucket_details.get("Error"):
-                    log.error("[X] Unable to fetch details about bucket: {}. "
-                              "The error details are: {}".format(b, bucket_details["Error"]))
+                if bucket_details.get('Error'):
+                    log.error('[X] Unable to fetch details about bucket: {}. '
+                              'The error details are: {}'.format(b, bucket_details['Error']))
                     continue
 
             except ClientError as ce:
-                if ce.response["Error"]["Code"] == "NoSuchBucket":
-                    log.warning("[?] Received update request for bucket: {} that does not "
-                                "currently exist. Skipping.".format(b))
+                if ce.response['Error']['Code'] == 'NoSuchBucket':
+                    log.warning('[?] Received update request for bucket: {} that does not '
+                                'currently exist. Skipping.'.format(b))
                     continue
 
                 # Catch Access Denied exceptions as well:
-                if ce.response["Error"]["Code"] == "AccessDenied":
-                    log.error("[X] Unable to fetch details for S3 Bucket: {} in {}. Access is Denied. Skipping...".format(
-                        b, account_id
-                    ))
+                if ce.response['Error']['Code'] == 'AccessDenied':
+                    log.error('[X] Unable to fetch details for S3 Bucket: {} in {}. Access is Denied. '
+                              'Skipping...'.format(b, account_id))
                     continue
                 raise Exception(ce)
 
             # Pull out the fields we want:
             data = {
-                "arn": "arn:aws:s3:::{}".format(b),
-                "principalId": cloudwatch.get_principal(item["eventDetails"]),
-                "userIdentity": cloudwatch.get_user_identity(item["eventDetails"]),
-                "accountId": account_id,
-                "eventTime": item["eventDetails"]["detail"]["eventTime"],
-                "BucketName": b,
-                "Region": bucket_details["Region"],
+                'arn': 'arn:aws:s3:::{}'.format(b),
+                'principalId': cloudwatch.get_principal(item['eventDetails']),
+                'userIdentity': cloudwatch.get_user_identity(item['eventDetails']),
+                'accountId': account_id,
+                'eventTime': item['eventDetails']['detail']['eventTime'],
+                'BucketName': b,
+                'Region': bucket_details.pop('Region'),
                 # Duplicated in top level and configuration for secondary index
-                "Tags": bucket_details["Tags"] or {},
-                "eventSource": item["eventDetails"]["detail"]["eventSource"]
+                'Tags': bucket_details.pop('Tags', {}),
+                'eventSource': item['eventDetails']['detail']['eventSource']
             }
 
             # Remove the fields we don't care about:
-            del bucket_details["Arn"]
-            del bucket_details["GrantReferences"]
-            del bucket_details["Region"]
+            del bucket_details['Arn']
+            del bucket_details['GrantReferences']
 
-            if not bucket_details.get("CreationDate"):
-                bucket_details["CreationDate"] = item["creationDate"]
+            if not bucket_details.get('CreationDate'):
+                bucket_details['CreationDate'] = item['creationDate']
 
-            data["configuration"] = bucket_details
+            data['configuration'] = bucket_details
 
             current_revision = CurrentS3Model(**data)
             current_revision.save()
@@ -186,12 +184,12 @@ def handler(event, context):
     # We don't want to query for deleted records.
     update_records, delete_records = group_records_by_type(records, UPDATE_EVENTS)
 
-    log.debug("[@] Processing update records...")
+    log.debug('[@] Processing update records...')
     process_update_records(update_records)
-    log.debug("[@] Completed processing of update records.")
+    log.debug('[@] Completed processing of update records.')
 
-    log.debug("[@] Processing delete records...")
+    log.debug('[@] Processing delete records...')
     process_delete_records(delete_records)
-    log.debug("[@] Completed processing of delete records.")
+    log.debug('[@] Completed processing of delete records.')
 
     log.debug('[@] Successfully updated current Historical table')

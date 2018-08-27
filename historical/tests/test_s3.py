@@ -257,10 +257,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
     handler(data, mock_lambda_environment)
     result = list(CurrentS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(result) == 1
-    # Verify that the tags are duplicated in the top level and configuration:
-    assert len(result[0].Tags.attribute_values) == len(result[0].configuration.attribute_values["Tags"]) == 1
-    assert result[0].Tags.attribute_values["theBucketName"] == \
-           result[0].configuration.attribute_values["Tags"]["theBucketName"] == "testbucket1"  # noqa
+    assert result[0].Tags.attribute_values["theBucketName"] == "testbucket1"
     assert result[0].eventSource == "aws.s3"
 
     # Polling (make sure the date is included):

@@ -25,8 +25,6 @@ class SecurityGroupModel(object):
     GroupId = UnicodeAttribute()
     GroupName = UnicodeAttribute()
     VpcId = UnicodeAttribute(null=True)
-    OwnerId = UnicodeAttribute()
-    Description = UnicodeAttribute()
     Tags = ListAttribute()
     Region = UnicodeAttribute()
 
