@@ -20,14 +20,19 @@ def filter_request_parameters(field_name, msg, look_in_response=False):
     From an event, extract the field name from the message.
     Different API calls put this information in different places, so check a few places.
     """
-    val = msg.get('detail', {}).get(field_name, None)
+    val = msg['detail'].get(field_name, None)
+    try:
+        if not val:
+            val = msg['detail'].get('requestParameters', {}).get(field_name, None)
 
-    if not val:
-        val = msg.get('detail', {}).get('requestParameters', {}).get(field_name, None)
+        # If we STILL didn't find it -- check if it's in the response element (default off)
+        if not val and look_in_response:
+            if msg['detail'].get('responseElements'):
+                val = msg['detail']['responseElements'].get(field_name, None)
 
-    # If we STILL didn't find it -- check if it's in the response element (default off)
-    if not val and look_in_response:
-        val = msg.get('detail', {}).get('responseElements', {}).get(field_name, None)
+    # Just in case... We didn't find the value, so just make it None:
+    except AttributeError as _:
+        val = None
 
     return val
 
@@ -38,7 +43,7 @@ def get_user_identity(event):
 
 
 def get_principal(event):
-    """Gets principal id from event"""
+    """Gets principal id from the event"""
     ui = get_user_identity(event)
     return ui.get('principalId', '').split(':')[-1]
 
@@ -63,9 +68,9 @@ def get_historical_base_info(event):
         'principalId': get_principal(event),
         'userIdentity': get_user_identity(event),
         'accountId': event['account'],
-        'userAgent': event.get('userAgent'),
-        'sourceIpAddress': event.get('sourceIpAddress'),
-        'requestParameters': event.get('requestParameters')
+        'userAgent': event['detail'].get('userAgent'),
+        'sourceIpAddress': event['detail'].get('sourceIPAddress'),
+        'requestParameters': event['detail'].get('requestParameters')
     }
 
     if event['detail'].get('eventTime'):
