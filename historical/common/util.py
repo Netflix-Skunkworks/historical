@@ -34,3 +34,21 @@ def deserialize_records(records):
             native_records.append(parsed)
 
     return native_records
+
+
+def pull_tag_dict(data):
+    """This will pull out a list of Tag Name-Value objects, and return it as a dictionary.
+
+    :param data: The dict collected from the collector.
+    :returns dict: A dict of the tag names and their corresponding values.
+    """
+    # If there are tags, set them to a normal dict, vs. a list of dicts:
+    tags = data.pop('Tags', {})
+    if tags:
+        proper_tags = {}
+        for t in tags:
+            proper_tags[t['Key']] = t['Value']
+
+        tags = proper_tags
+
+    return tags

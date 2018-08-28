@@ -39,6 +39,7 @@ S3_BUCKET = {
     "BucketName": "testbucket1",
     "Region": "us-east-1",
     "Tags": {},
+    "schema_version": 9,
     "configuration": {
         "Grants": {
             "75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a": [
@@ -69,9 +70,7 @@ S3_BUCKET = {
         "CreationDate": "2006-02-03T16:45:09Z",
         "AnalyticsConfigurations": [],
         "MetricsConfigurations": [],
-        "InventoryConfigurations": [],
-        "Name": "testbucket1",
-        "_version": 8
+        "InventoryConfigurations": []
     }
 }
 
@@ -90,7 +89,7 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
         eventName='INSERT'), default=serialize))
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
-    assert result.configuration.attribute_values['Name'] == "testbucket1"
+    assert result.BucketName == "testbucket1"
     assert isinstance(result, CurrentS3Model)
 
     # And for event_too_big:
@@ -117,7 +116,7 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
     ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
-    assert result.configuration.attribute_values['Name'] == "testbucket1"
+    assert result.BucketName == "testbucket1"
     assert isinstance(result, CurrentS3Model)
 
     # And if the object isn't in the current table:
@@ -148,7 +147,7 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
         eventName='INSERT'), default=serialize))
     result = deserialize_durable_record_to_durable_model(ddb_record, DurableS3Model)
     assert result
-    assert result.configuration.attribute_values['Name'] == "testbucket1"
+    assert result.BucketName == "testbucket1"
     assert result.eventTime == bucket['eventTime']
     assert isinstance(result, DurableS3Model)
 
@@ -166,7 +165,7 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
 
     result = deserialize_durable_record_to_durable_model(ddb_record, DurableS3Model)
     assert result
-    assert result.configuration.attribute_values['Name'] == "testbucket1"
+    assert result.BucketName == "testbucket1"
     assert result.eventTime == bucket['eventTime']
     assert isinstance(result, DurableS3Model)
 
@@ -198,7 +197,7 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
         eventName='INSERT'), default=serialize))
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
-    assert result.configuration.attribute_values['Name'] == "testbucket1"
+    assert result.BucketName == "testbucket1"
     assert isinstance(result, CurrentS3Model)
 
     # And for event_too_big:
@@ -227,7 +226,7 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
     assert result
-    assert result.configuration.attribute_values['Name'] == "testbucket1"
+    assert result.BucketName == "testbucket1"
     assert isinstance(result, CurrentS3Model)
 
     # And if the object isn't in the durable table:

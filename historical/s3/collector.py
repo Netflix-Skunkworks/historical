@@ -155,12 +155,15 @@ def process_update_records(update_records):
                 'Region': bucket_details.pop('Region'),
                 # Duplicated in top level and configuration for secondary index
                 'Tags': bucket_details.pop('Tags', {}),
-                'eventSource': item['eventDetails']['detail']['eventSource']
+                'eventSource': item['eventDetails']['detail']['eventSource'],
+                'schema_version': bucket_details['_version']
             }
 
             # Remove the fields we don't care about:
             del bucket_details['Arn']
             del bucket_details['GrantReferences']
+            del bucket_details['_version']
+            del bucket_details['Name']
 
             if not bucket_details.get('CreationDate'):
                 bucket_details['CreationDate'] = item['creationDate']

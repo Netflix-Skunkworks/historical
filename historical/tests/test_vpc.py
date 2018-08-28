@@ -34,7 +34,7 @@ VPC = {
     'CidrBlock': 'string',
     'State': 'available',
     'Name': 'vpc0',
-    'Tags': [{'Key': 'name', 'Value': 'vpc0'}],
+    'Tags': {'name': 'vpc0'},
     'Region': 'us-east-1',
     'configuration': {
         'CidrBlock': 'string',
@@ -62,13 +62,7 @@ VPC = {
                 }
             },
         ],
-        'IsDefault': True,
-        'Tags': [
-            {
-                'Key': 'name',
-                'Value': 'vpc0'
-            },
-        ]
+        'IsDefault': True
     },
 }
 

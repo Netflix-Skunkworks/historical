@@ -14,6 +14,7 @@ import boto3
 
 from historical.common.sqs import get_queue_url
 from historical.models import HistoricalPollerTaskEventModel
+from historical.security_group.models import SCHEMA_VERSION
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
@@ -32,7 +33,8 @@ SECURITY_GROUP = {
     'VpcId': 'vpc-123343',
     'accountId': '123456789012',
     'Region': 'us-east-1',
-    'Tags': [{'Name': 'test', 'Value': '<empty>'}],
+    'Tags': {'test': '<empty>'},
+    'schema_version': SCHEMA_VERSION,
     'configuration': {
         'IpPermissions': [
             {
@@ -173,7 +175,7 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
     messages = make_poller_events()
     event = json.loads(json.dumps(RecordsFactory(records=messages), default=serialize))
 
-    # Run the collector:
+    # Run the poller handler:
     handler(event, mock_lambda_environment)
 
     # Need to ensure that 3 total SGs were added into SQS:
@@ -292,7 +294,13 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
 
     handler(data, mock_lambda_environment)
 
-    assert CurrentSecurityGroupModel.count() == 1
+    group = list(CurrentSecurityGroupModel.scan())
+    assert len(group) == 1
+
+    # Validate that Tags are correct:
+    assert len(group[0].Tags.attribute_values) == 2
+    assert group[0].Tags.attribute_values['Some'] == 'Value'
+    assert group[0].Tags.attribute_values['Empty'] == '<empty>'
 
     event = CloudwatchEventFactory(
         detail=DetailFactory(

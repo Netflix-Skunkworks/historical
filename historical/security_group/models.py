@@ -9,7 +9,7 @@ from marshmallow import Schema, fields, post_dump
 
 from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute, ListAttribute
+from pynamodb.attributes import UnicodeAttribute, NumberAttribute, MapAttribute
 
 from historical.constants import CURRENT_REGION
 from historical.models import (
@@ -20,12 +20,14 @@ from historical.models import (
     AWSHistoricalMixin
 )
 
+SCHEMA_VERSION = 1
+
 
 class SecurityGroupModel(object):
     GroupId = UnicodeAttribute()
     GroupName = UnicodeAttribute()
     VpcId = UnicodeAttribute(null=True)
-    Tags = ListAttribute()
+    Tags = MapAttribute()
     Region = UnicodeAttribute()
 
 

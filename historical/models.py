@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 
 from marshmallow import Schema, fields
+from historical.attributes import HistoricalDecimalAttribute
 from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
 
 from historical.constants import TTL_EXPIRY
@@ -46,6 +47,7 @@ class AWSHistoricalMixin(object):
     userAgent = UnicodeAttribute(null=True)
     sourceIpAddress = UnicodeAttribute(null=True)
     requestParameters = MapAttribute(null=True)
+    schema_version = HistoricalDecimalAttribute(default=1)
 
 
 class HistoricalPollingEventDetail(Schema):

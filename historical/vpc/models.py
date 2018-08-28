@@ -9,7 +9,7 @@ from marshmallow import Schema, fields, post_dump
 
 from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute, ListAttribute, BooleanAttribute
+from pynamodb.attributes import UnicodeAttribute, NumberAttribute, BooleanAttribute, MapAttribute
 
 from historical.constants import CURRENT_REGION
 from historical.models import (
@@ -25,7 +25,7 @@ class VPCModel(object):
     VpcId = UnicodeAttribute()
     State = UnicodeAttribute()
     CidrBlock = UnicodeAttribute()
-    Tags = ListAttribute()
+    Tags = MapAttribute()
     IsDefault = BooleanAttribute()
     Name = UnicodeAttribute(null=True)
     Region = UnicodeAttribute()

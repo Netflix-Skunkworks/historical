@@ -42,6 +42,7 @@ S3_BUCKET = {
         },
         "principalId": "AROAIKELBS2RNWG7KASDF:joe@example.com"
     },
+    'schema_version': 9,
     "accountId": "123456789012",
     "eventTime": "2017-09-08T00:34:34Z",
     "eventSource": "aws.s3",
@@ -79,8 +80,6 @@ S3_BUCKET = {
         "AnalyticsConfigurations": [],
         "MetricsConfigurations": [],
         "InventoryConfigurations": [],
-        "Name": "testbucket1",
-        "_version": 8
     }
 }
 
@@ -354,10 +353,14 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     assert DurableS3Model.count() == 1
 
     # Test ephemeral changes don't add new models:
+    import historical.s3.differ
+    old_ep = historical.s3.differ.EPHEMERAL_PATHS
+    historical.s3.differ.EPHEMERAL_PATHS = ["root['schema_version']"]
+
     ephemeral_changes = S3_BUCKET.copy()
     ephemeral_changes["eventTime"] = \
         datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
-    ephemeral_changes["configuration"]["_version"] = 99999
+    ephemeral_changes["schema_version"] = 99999
     ephemeral_changes["ttl"] = ttl
 
     data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
@@ -409,3 +412,5 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
     assert DurableS3Model.count() == 3
+
+    historical.s3.differ.EPHEMERAL_PATHS = old_ep

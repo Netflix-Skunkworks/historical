@@ -260,7 +260,7 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
     # Verify that the existing bucket in the Current table is in the Durable table with the correct configuration:
     result = list(DurableS3Model.query("arn:aws:s3:::testbucket1"))
     assert len(result) == 1
-    assert result[0].configuration.attribute_values['Name'] == 'testbucket1'
+    assert result[0].BucketName == 'testbucket1'
 
     # Verify that the missing bucket is ignored -- as it will be processed presumably later:
     result = list(DurableS3Model.query("arn:aws:s3:::notinthecurrenttable"))
