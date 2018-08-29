@@ -17,7 +17,7 @@ from cloudaux.aws.ec2 import describe_vpcs
 from historical.common.sqs import group_records_by_type
 from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
-from historical.common.util import deserialize_records
+from historical.common.util import deserialize_records, pull_tag_dict
 from historical.vpc.models import CurrentVPCModel
 
 logging.basicConfig()
@@ -147,7 +147,6 @@ def capture_update_records(records):
         log.debug('Processing vpc. Vpc: {}'.format(vpc))
         data.update({
             'VpcId': vpc.get('VpcId'),
-            'Tags': vpc.get('Tags', []),
             'arn': get_arn(vpc['VpcId'], data['accountId']),
             'configuration': vpc,
             'State': vpc.get('State'),
@@ -157,7 +156,9 @@ def capture_update_records(records):
             'Region': cloudwatch.get_region(record)
         })
 
-        log.debug('[+] Writing Dynamodb Record. Records: {record}'.format(record=data))
+        data['Tags'] = pull_tag_dict(vpc)
+
+        log.debug('[+] Writing DynamoDB Record. Records: {record}'.format(record=data))
 
         current_revision = CurrentVPCModel(**data)
         current_revision.save()

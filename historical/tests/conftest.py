@@ -203,11 +203,25 @@ def buckets(s3):
 @pytest.fixture(scope='function')
 def security_groups(ec2):
     """Creates security groups."""
-    yield ec2.create_security_group(
+    sg = ec2.create_security_group(
         Description='test security group',
         GroupName='test',
         VpcId='vpc-test'
     )
+
+    # Tag it:
+    ec2.create_tags(Resources=[sg['GroupId']], Tags=[
+        {
+            "Key": "Some",
+            "Value": "Value"
+        },
+        {
+            "Key": "Empty",
+            "Value": ""
+        }
+    ])
+
+    yield sg
 
 
 @pytest.fixture(scope='function')

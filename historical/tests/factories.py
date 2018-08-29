@@ -5,7 +5,6 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
-
 import pytz
 import datetime
 from boto3.dynamodb.types import TypeSerializer

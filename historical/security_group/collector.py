@@ -5,7 +5,6 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
-import os
 import logging
 
 from botocore.exceptions import ClientError
@@ -18,8 +17,8 @@ from cloudaux.aws.ec2 import describe_security_groups
 from historical.common.sqs import group_records_by_type
 from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
-from historical.common.util import deserialize_records
-from historical.security_group.models import CurrentSecurityGroupModel
+from historical.common.util import deserialize_records, pull_tag_dict
+from historical.security_group.models import CurrentSecurityGroupModel, SCHEMA_VERSION
 
 logging.basicConfig()
 log = logging.getLogger('historical')
@@ -158,16 +157,19 @@ def capture_update_records(records):
             'GroupId': group['GroupId'],
             'GroupName': group.pop('GroupName'),
             'VpcId': group.pop('VpcId', None),
-            'Tags': group.pop('Tags', []),
             'arn': get_arn(group.pop('GroupId'), group.pop('OwnerId')),
             'Region': cloudwatch.get_region(record)
         })
 
+        data['Tags'] = pull_tag_dict(group)
+
         # Set the remaining items to the configuration:
         data['configuration'] = group
 
-        log.debug('[+] Writing Dynamodb Record. Records: {record}'.format(record=data))
+        # Set the version:
+        data['schema_version'] = SCHEMA_VERSION
 
+        log.debug('[+] Writing Dynamodb Record. Records: {record}'.format(record=data))
         current_revision = CurrentSecurityGroupModel(**data)
         current_revision.save()
 

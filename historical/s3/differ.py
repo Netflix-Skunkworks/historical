@@ -23,10 +23,7 @@ log = logging.getLogger('historical')
 log.setLevel(LOGGING_LEVEL)
 
 # Path to where in the dict the ephemeral field is -- starting with "root['M'][PathInConfigDontForgetDataType]..."
-EPHEMERAL_PATHS = [
-    # Configuration level changes are don't care about:
-    "root['configuration']['M']['_version']"
-]
+EPHEMERAL_PATHS = []
 
 
 def is_new_revision(latest_revision, current_revision):
