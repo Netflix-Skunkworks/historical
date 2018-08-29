@@ -18,6 +18,7 @@ from mock import MagicMock
 
 from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.models import TTL_EXPIRY
+from historical.s3.models import VERSION
 from historical.tests.factories import DynamoDBRecordFactory, DynamoDBDataFactory, DynamoDBRecordsFactory, serialize, \
     CloudwatchEventFactory, DetailFactory, RecordsFactory, SQSDataFactory, SnsDataFactory
 
@@ -38,6 +39,7 @@ S3_BUCKET = {
     "eventTime": "2017-09-08T00:34:34Z",
     "eventSource": "aws.s3",
     "BucketName": "testbucket1",
+    'version': VERSION,
     "Region": "us-east-1",
     "Tags": {},
     "configuration": {
@@ -69,10 +71,7 @@ S3_BUCKET = {
         "Replication": {},
         "CreationDate": "2006-02-03T16:45:09Z",
         "AnalyticsConfigurations": [],
-        "MetricsConfigurations": [],
-        "InventoryConfigurations": [],
-        "Name": "testbucket1",
-        "_version": 8
+        "MetricsConfigurations": []
     }
 }
 
@@ -95,7 +94,7 @@ def test_make_blob():
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
-    shrunken_blob = shrink_blob(data)
+    shrunken_blob = shrink_blob(data, False)
 
     assert shrunken_blob['userIdentity'] == data['userIdentity']
     assert shrunken_blob[EVENT_TOO_BIG_FLAG]
@@ -174,6 +173,25 @@ def test_make_proper_record():
     assert not item
     assert mock_logger.debug.called
 
+    # For a deletion event:
+    deleted_bucket = S3_BUCKET.copy()
+    deleted_bucket['Tags'] = {}
+    deleted_bucket['configuration'] = {}
+    new_bucket['Region'] = 'us-east-1'
+    ddb_deleted_item = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=deleted_bucket,
+            Keys={
+                'arn': deleted_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    deleted_item = DynamoDBRecordsFactory(records=[ddb_deleted_item])
+    data = json.loads(json.dumps(deleted_item, default=serialize))['Records'][0]
+    item = json.loads(make_proper_record(data))
+    assert not item['dynamodb']['OldImage'].get('configuration')
+    assert not item['dynamodb']['NewImage']['configuration']['M']
+
     # Unmock:
     historical.common.proxy._publish_sns_message = old_publish_message
     historical.common.proxy.log = old_logger
@@ -233,7 +251,6 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
     missing_bucket['ttl'] = ttl
     missing_bucket['BucketName'] = 'notinthecurrenttable'
     missing_bucket['arn'] = 'arn:aws:s3:::notinthecurrenttable'
-    missing_bucket['configuration']['Name'] = 'notinthecurrenttable'
     ddb_missing_item = DynamoDBRecordFactory(
         dynamodb=DynamoDBDataFactory(
             NewImage=missing_bucket,
@@ -244,10 +261,10 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
         eventName='INSERT')
 
     # Get the shrunken blob:
-    shrunken_existing = json.dumps(shrink_blob(json.loads(json.dumps(ddb_existing_item, default=serialize))))
-    shrunken_missing = json.dumps(shrink_blob(json.loads(json.dumps(ddb_missing_item, default=serialize))))
+    shrunken_existing = json.dumps(shrink_blob(json.loads(json.dumps(ddb_existing_item, default=serialize)), False))
+    shrunken_missing = json.dumps(shrink_blob(json.loads(json.dumps(ddb_missing_item, default=serialize)), False))
 
-    # Also try one without the SNS data factory -- it should stil work properly on de-serialization:
+    # Also try one without the SNS data factory -- it should still work properly on de-serialization:
     records = RecordsFactory(
         records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=shrunken_existing), default=serialize)),
                  SQSDataFactory(body=json.dumps(shrunken_missing, default=serialize))]
@@ -280,6 +297,39 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
 
     mocked_logger.error.assert_called_once_with('[?] Received item too big for SNS, and was not able to '
                                                 'find the original item with ARN: arn:aws:s3:::notinthecurrenttable')
+
+    # Now, let's test if we are dealing with a deletion event:
+    deleted_bucket = S3_BUCKET.copy()
+    deleted_bucket['Tags'] = {}
+    deleted_bucket['configuration'] = {}
+    ddb_deleted_item = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=deleted_bucket,
+            Keys={
+                'arn': deleted_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+
+    data = json.dumps(ddb_deleted_item, default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
+    data = json.loads(json.dumps(data, default=serialize))
+
+    # Get the proper shrunken record:
+    shrunken_deletion = json.dumps(shrink_blob(json.loads(json.dumps(ddb_deleted_item, default=serialize)), True))
+    records = RecordsFactory(
+        records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=shrunken_deletion), default=serialize))]
+    )
+    records_event = json.loads(json.dumps(records, default=serialize))
+
+    # Run the differ:
+    diff_handler(records_event, mock_lambda_environment)
+
+    # Verify that the existing bucket now has a deletion record:
+    result = list(DurableS3Model.query(deleted_bucket['arn']))
+    assert len(result) == 2
+    assert result[0].configuration.attribute_values
+    assert not result[1].configuration.attribute_values
 
     # Unmock the logger:
     historical.common.dynamodb.log = old_logger

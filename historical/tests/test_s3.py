@@ -17,7 +17,7 @@ from botocore.exceptions import ClientError
 
 from historical.common.sqs import get_queue_url
 from historical.models import HistoricalPollerTaskEventModel
-from historical.s3.models import s3_polling_schema, CurrentS3Model
+from historical.s3.models import s3_polling_schema, CurrentS3Model, VERSION
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
@@ -42,7 +42,7 @@ S3_BUCKET = {
         },
         "principalId": "AROAIKELBS2RNWG7KASDF:joe@example.com"
     },
-    'schema_version': 9,
+    'version': VERSION,
     "accountId": "123456789012",
     "eventTime": "2017-09-08T00:34:34Z",
     "eventSource": "aws.s3",
@@ -355,12 +355,12 @@ def test_differ(current_s3_table, durable_s3_table, mock_lambda_environment):
     # Test ephemeral changes don't add new models:
     import historical.s3.differ
     old_ep = historical.s3.differ.EPHEMERAL_PATHS
-    historical.s3.differ.EPHEMERAL_PATHS = ["root['schema_version']"]
+    historical.s3.differ.EPHEMERAL_PATHS = ["root['version']"]
 
     ephemeral_changes = S3_BUCKET.copy()
     ephemeral_changes["eventTime"] = \
         datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
-    ephemeral_changes["schema_version"] = 99999
+    ephemeral_changes["version"] = 99999
     ephemeral_changes["ttl"] = ttl
 
     data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(

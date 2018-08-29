@@ -24,6 +24,7 @@ from historical.tests.factories import (
     UserIdentityFactory,
     serialize,
     SnsDataFactory)
+from historical.vpc.models import VERSION
 
 VPC = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343',
@@ -36,6 +37,7 @@ VPC = {
     'Name': 'vpc0',
     'Tags': {'name': 'vpc0'},
     'Region': 'us-east-1',
+    'version': VERSION,
     'configuration': {
         'CidrBlock': 'string',
         'DhcpOptionsId': 'string',

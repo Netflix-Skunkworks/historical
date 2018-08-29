@@ -20,7 +20,7 @@ from historical.models import (
     AWSHistoricalMixin
 )
 
-SCHEMA_VERSION = 1
+VERSION = 1
 
 
 class SecurityGroupModel(object):

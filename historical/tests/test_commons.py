@@ -17,6 +17,7 @@ from swag_client.util import parse_swag_config_options
 from historical.common.exceptions import DurableItemIsMissingException
 from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.s3.collector import process_update_records
+from historical.s3.models import VERSION
 from historical.tests.factories import CloudwatchEventFactory, DetailFactory, serialize, DynamoDBRecordFactory, \
     DynamoDBDataFactory
 
@@ -39,7 +40,7 @@ S3_BUCKET = {
     "BucketName": "testbucket1",
     "Region": "us-east-1",
     "Tags": {},
-    "schema_version": 9,
+    "version": VERSION,
     "configuration": {
         "Grants": {
             "75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a": [
