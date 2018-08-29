@@ -14,7 +14,7 @@ import boto3
 
 from historical.common.sqs import get_queue_url
 from historical.models import HistoricalPollerTaskEventModel
-from historical.security_group.models import SCHEMA_VERSION
+from historical.security_group.models import VERSION
 from historical.tests.factories import (
     CloudwatchEventFactory,
     DetailFactory,
@@ -34,7 +34,7 @@ SECURITY_GROUP = {
     'accountId': '123456789012',
     'Region': 'us-east-1',
     'Tags': {'test': '<empty>'},
-    'schema_version': SCHEMA_VERSION,
+    'version': VERSION,
     'configuration': {
         'IpPermissions': [
             {

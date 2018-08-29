@@ -28,7 +28,7 @@ def _publish_sns_message(client, blob, topic_arn):
     client.publish(TopicArn=topic_arn, Message=blob)
 
 
-def shrink_blob(record):
+def shrink_blob(record, deletion):
     """
     Makes a shrunken blob to be sent to SNS/SQS (due to the 256KB size limitations of SNS/SQS messages).
     This will essentially remove the "configuration" field such that the size of the SNS/SQS message remains under
@@ -38,7 +38,7 @@ def shrink_blob(record):
     """
     item = {
         "eventName": record["eventName"],
-        EVENT_TOO_BIG_FLAG: True
+        EVENT_TOO_BIG_FLAG: (not deletion)
     }
 
     # To handle TTLs (if they happen)
@@ -46,8 +46,10 @@ def shrink_blob(record):
         item["userIdentity"] = record["userIdentity"]
 
     # Remove the 'configuration' field from new and old images if applicable:
-    if record['dynamodb'].get('NewImage'):
-        record['dynamodb']['NewImage'].pop('configuration', None)
+    if not deletion:
+        # Only remove it from non-deletions:
+        if record['dynamodb'].get('NewImage'):
+            record['dynamodb']['NewImage'].pop('configuration', None)
 
     if record['dynamodb'].get('OldImage'):
         record['dynamodb']['OldImage'].pop('configuration', None)
@@ -113,11 +115,21 @@ def make_proper_record(record, force_shrink=False):
                 return
 
     blob = json.dumps(record)
-
     size = math.ceil(sys.getsizeof(blob) / 1024)
+
     if size >= 200 or force_shrink:
         # Need to send over a smaller blob to inform the recipient that it needs to go out and
         # fetch the item from the Historical table!
-        blob = json.dumps(shrink_blob(record))
+
+        deletion = False
+        # ^^ However -- deletions need to be handled differently, because the Differ won't be able to find a
+        # deleted record. For deletions, we will only shrink the 'OldImage', but preserve the 'NewImage' since that is
+        # "already" shrunken.
+        if record['dynamodb'].get('NewImage'):
+            # Config will be empty if there was a deletion:
+            if not (record['dynamodb']['NewImage'].get('configuration', {}) or {}).get('M'):
+                deletion = True
+
+        blob = json.dumps(shrink_blob(record, deletion))
 
     return blob

@@ -18,7 +18,7 @@ from historical.common.sqs import group_records_by_type
 from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records, pull_tag_dict
-from historical.vpc.models import CurrentVPCModel
+from historical.vpc.models import CurrentVPCModel, VERSION
 
 logging.basicConfig()
 log = logging.getLogger('historical')
@@ -153,7 +153,8 @@ def capture_update_records(records):
             'IsDefault': vpc.get('IsDefault'),
             'CidrBlock': vpc.get('CidrBlock'),
             'Name': get_vpc_name(vpc),
-            'Region': cloudwatch.get_region(record)
+            'Region': cloudwatch.get_region(record),
+            'version': VERSION
         })
 
         data['Tags'] = pull_tag_dict(vpc)

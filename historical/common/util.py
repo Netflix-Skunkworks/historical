@@ -43,7 +43,7 @@ def pull_tag_dict(data):
     :returns dict: A dict of the tag names and their corresponding values.
     """
     # If there are tags, set them to a normal dict, vs. a list of dicts:
-    tags = data.pop('Tags', {})
+    tags = data.pop('Tags', {}) or {}
     if tags:
         proper_tags = {}
         for t in tags:

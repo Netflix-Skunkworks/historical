@@ -292,7 +292,7 @@ def process_dynamodb_differ_record(record, current_model, durable_model, diff_fu
         if record.get('userIdentity'):
             if record['userIdentity']['type'] == 'Service':
                 if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
-                    log.error('We received a TTL delete. Old Image: {}'.format(record['dynamodb']['OldImage']))
+                    log.error('[TTL] We received a TTL delete. Old Image: {}'.format(record['dynamodb']['OldImage']))
                     old_image = remove_current_specific_fields(record['dynamodb']['OldImage'])
                     delete_differ_record(old_image, durable_model)
 

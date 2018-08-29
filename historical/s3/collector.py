@@ -17,7 +17,7 @@ from historical.common.sqs import group_records_by_type
 from historical.constants import HISTORICAL_ROLE, CURRENT_REGION, LOGGING_LEVEL
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records
-from historical.s3.models import CurrentS3Model
+from historical.s3.models import CurrentS3Model, VERSION
 
 logging.basicConfig()
 log = logging.getLogger('historical')
@@ -67,7 +67,8 @@ def create_delete_model(record):
         'Region': cloudwatch.get_region(record),
         'Tags': {},
         'configuration': {},
-        'eventSource': record['detail']['eventSource']
+        'eventSource': record['detail']['eventSource'],
+        'version': VERSION
     }
 
     return CurrentS3Model(**data)
@@ -154,9 +155,9 @@ def process_update_records(update_records):
                 'BucketName': b,
                 'Region': bucket_details.pop('Region'),
                 # Duplicated in top level and configuration for secondary index
-                'Tags': bucket_details.pop('Tags', {}),
+                'Tags': bucket_details.pop('Tags', {}) or {},
                 'eventSource': item['eventDetails']['detail']['eventSource'],
-                'schema_version': bucket_details['_version']
+                'version': VERSION
             }
 
             # Remove the fields we don't care about:

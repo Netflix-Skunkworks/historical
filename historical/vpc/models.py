@@ -21,6 +21,9 @@ from historical.models import (
 )
 
 
+VERSION = 1
+
+
 class VPCModel(object):
     VpcId = UnicodeAttribute()
     State = UnicodeAttribute()

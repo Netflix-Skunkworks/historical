@@ -15,6 +15,10 @@ from historical.models import DurableHistoricalModel, CurrentHistoricalModel, AW
     HistoricalPollingEventDetail, HistoricalPollingBaseModel
 
 
+# The schema version -- TODO: Get this from CloudAux
+VERSION = 9
+
+
 class S3Model(object):
     BucketName = UnicodeAttribute()
     Region = UnicodeAttribute()
