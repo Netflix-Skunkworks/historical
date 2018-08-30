@@ -23,7 +23,7 @@ def deserialize_records(records):
             native_records.append(json.loads(parsed))
 
         # Is this a subscription message from SNS? If so, skip it:
-        elif parsed.get('Message') and parsed.get('UnsubscribeURL'):
+        elif parsed.get('Type') == 'SubscriptionConfirmation':
             continue
 
         # Is this from SNS (cross-region request -- SNS messages wrapped in SQS message) -- or an SNS proxied message?
