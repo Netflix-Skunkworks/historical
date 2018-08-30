@@ -48,7 +48,7 @@ def get_arn(group_id, account_id):
     )
 
 
-def describe_group(record):
+def describe_group(record, region):
     """Attempts to  describe group ids."""
     account_id = record['account']
     group_name = cloudwatch.filter_request_parameters('groupName', record)
@@ -61,7 +61,7 @@ def describe_group(record):
             return describe_security_groups(
                 account_number=account_id,
                 assume_role=HISTORICAL_ROLE,
-                region=CURRENT_REGION,
+                region=region,
                 GroupIds=[group_id]
             )['SecurityGroups']
 
@@ -69,7 +69,7 @@ def describe_group(record):
             return describe_security_groups(
                 account_number=account_id,
                 assume_role=HISTORICAL_ROLE,
-                region=CURRENT_REGION,
+                region=region,
                 Filters=[
                     {
                         'Name': 'group-name',
@@ -140,7 +140,7 @@ def capture_update_records(records):
     """Writes all updated configuration info to DynamoDB"""
     for record in records:
         data = cloudwatch.get_historical_base_info(record)
-        group = describe_group(record)
+        group = describe_group(record, cloudwatch.get_region(record))
 
         if len(group) > 1:
             raise Exception('[X] Multiple groups found. Record: {record}'.format(record=record))

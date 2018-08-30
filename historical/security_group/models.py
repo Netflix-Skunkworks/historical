@@ -72,13 +72,14 @@ class SecurityGroupPollingEventModel(HistoricalPollingBaseModel):
         data['version'] = '1'
         return data
 
-    def serialize(self, account, group):
+    def serialize(self, account, group, region):
         return self.dumps({
             'account': account,
             'detail': {
                 'request_parameters': {
                     'groupId': group['GroupId']
-                }
+                },
+                'awsRegion': region
             }
         }).data
 

@@ -79,7 +79,10 @@ def poller_processor_handler(event, context):
                 assume_role=HISTORICAL_ROLE,
                 region=record['region']
             )
-            events = [security_group_polling_schema.serialize(record['account_id'], g) for g in groups['SecurityGroups']]
+            # TODO Refactor this so that it actually works properly and doesn't spam the AWS API with
+            # un-necessary calls.
+            events = [security_group_polling_schema.serialize(record['account_id'], g, record['region'])
+                      for g in groups['SecurityGroups']]
             produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
 
             log.debug('[@] Finished generating polling events. Account: {}/{} '
