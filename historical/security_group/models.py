@@ -51,12 +51,9 @@ class ViewIndex(GlobalSecondaryIndex):
     view = NumberAttribute(default=0, hash_key=True)
 
 
-class SecurityGroupPollingRequestParamsModel(Schema):
-    group_id = fields.Str(dump_to='groupId', load_from='groupId', required=True)
-    owner_id = fields.Str(dump_to='ownerId', load_from='ownerId', required=True)
-
-
 class SecurityGroupPollingEventDetail(HistoricalPollingEventDetail):
+    region = fields.Str(required=True, load_from='awsRegion', dump_to='awsRegion')
+
     @post_dump
     def add_required_security_group_polling_data(self, data):
         data['eventSource'] = 'historical.ec2.poller'
@@ -79,7 +76,7 @@ class SecurityGroupPollingEventModel(HistoricalPollingBaseModel):
                 'request_parameters': {
                     'groupId': group['GroupId']
                 },
-                'awsRegion': region
+                'region': region
             }
         }).data
 
