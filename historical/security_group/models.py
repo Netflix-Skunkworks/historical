@@ -70,13 +70,11 @@ class SecurityGroupPollingEventModel(HistoricalPollingBaseModel):
         return data
 
     def serialize(self, account, group, region):
-        group_id = group.pop('GroupId')
-
         return self.dumps({
             'account': account,
             'detail': {
                 'request_parameters': {
-                    'groupId': group_id
+                    'groupId': group['GroupId']
                 },
                 'region': region,
                 'collected': group
