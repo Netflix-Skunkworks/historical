@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 
 import boto3
+from mock import patch
 
 from historical.common.sqs import get_queue_url
 from historical.models import HistoricalPollerTaskEventModel
@@ -169,6 +170,23 @@ def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_acc
 
 
 def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
+    # Mock this so it returns a `NextToken`:
+    def mock_describe_security_groups(**kwargs):
+        from cloudaux.aws.ec2 import describe_security_groups
+
+        # Did we receive a NextToken? (this will happen on the second run through to verify that
+        # this logic is being reached:
+        if kwargs.get('NextToken'):
+            assert kwargs['NextToken'] == 'MOARRESULTS'
+
+        result = describe_security_groups(**kwargs)
+        result['NextToken'] = 'MOARRESULTS'
+
+        return result
+
+    p = patch('historical.security_group.poller.describe_security_groups', mock_describe_security_groups)
+    p.start()
+
     from historical.security_group.poller import poller_processor_handler as handler
     from historical.common import cloudwatch
 
@@ -186,9 +204,24 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
     messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
     assert len(messages) == 3
 
-    # Verify that the region is properly propagated through:
+    # Verify that the region is properly propagated through, and that we got the collected data:
     for m in messages:
-        assert cloudwatch.get_region(json.loads(m['Body'])) == 'us-east-1'
+        body = json.loads(m['Body'])
+        assert cloudwatch.get_region(body) == 'us-east-1'
+        assert body['detail']['collected']['OwnerId'] == '123456789012'
+        assert not body['detail']['collected'].get('ResponseMetadata')
+
+    # Now, verify that the pagination was sent in properly to SQS tasker queue:
+    queue_url = get_queue_url(os.environ['POLLER_TASKER_QUEUE_NAME'])
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
+    assert len(messages) == 1
+    assert json.loads(messages[0]['Body'])['NextToken'] == 'MOARRESULTS'
+
+    # Re-run the poller:
+    messages[0]['body'] = messages[0]['Body']   # Need to change the casing
+    handler({'Records': messages}, mock_lambda_environment)
+
+    p.stop()
 
 
 def test_differ(current_security_group_table, durable_security_group_table, mock_lambda_environment):
@@ -284,8 +317,47 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
 
 def test_collector(historical_role, mock_lambda_environment, historical_sqs, security_groups,
                    current_security_group_table):
+    # This should NOT be called at first:
+    def mock_describe_security_groups(**kwargs):
+        assert False
+
+    p = patch('historical.security_group.collector.describe_security_groups', mock_describe_security_groups)
+    p.start()
+
     from historical.security_group.models import CurrentSecurityGroupModel
     from historical.security_group.collector import handler
+    from cloudaux.aws.ec2 import describe_security_groups
+    sg_details = describe_security_groups(
+            account_number='012345678910',
+            assume_role='Historical',
+            region='us-east-1',
+            GroupIds=[security_groups['GroupId']]
+        )['SecurityGroups'][0]
+
+    event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={'groupId': security_groups['GroupId']},
+            eventName='Poller',
+            collected=sg_details
+        )
+    )
+    data = json.dumps(event, default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, mock_lambda_environment)
+    p.stop()
+    group = list(CurrentSecurityGroupModel.scan())
+    assert len(group) == 1
+
+    # Validate that Tags are correct:
+    assert len(group[0].Tags.attribute_values) == 2
+    assert group[0].Tags.attribute_values['Some'] == 'Value'
+    assert group[0].Tags.attribute_values['Empty'] == '<empty>'
+    group[0].delete()
+
+    # Standard SG events:
     event = CloudwatchEventFactory(
         detail=DetailFactory(
             requestParameters={'groupId': security_groups['GroupId']},
@@ -335,5 +407,4 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
     data = json.loads(data)
 
     handler(data, mock_lambda_environment)
-
     assert CurrentSecurityGroupModel.count() == 1

@@ -28,7 +28,7 @@ log.setLevel(LOGGING_LEVEL)
 UPDATE_EVENTS = [
     'CreateVpc',
     'ModifyVpcAttribute',
-    'HistoricalPoller'
+    'Poller'
 ]
 
 DELETE_EVENTS = [

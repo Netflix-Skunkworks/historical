@@ -96,7 +96,7 @@ def modify_record(durable_model, current_revision, arn, event_time, diff_func):
             current_revision.save()
     else:
         current_revision.save()
-        log.error('Got modify event but no current revision found. Arn: {arn}'.format(arn=arn))
+        log.info('[?] Got modify event but no current revision found. Arn: {arn}'.format(arn=arn))
 
 
 def delete_differ_record(old_image, durable_model):
