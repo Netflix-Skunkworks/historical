@@ -97,6 +97,7 @@ def poller_processor_handler(event, context):
             # FIRST THINGS FIRST: Did we get a `NextToken`? If so, we need to enqueue that ASAP because
             # 'NextToken`s expire in 60 seconds!
             if groups.get('NextToken'):
+                logging.debug(f"[-->] Pagination required {groups['NextToken']}. Tasking continuation.")
                 produce_events(
                     [poller_task_schema.serialize_me(record['account_id'], record['region'],
                                                      next_token=groups['NextToken'])],
