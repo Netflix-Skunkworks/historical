@@ -170,6 +170,7 @@ def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_acc
 
 def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
     from historical.security_group.poller import poller_processor_handler as handler
+    from historical.common import cloudwatch
 
     # Create the events and SQS records:
     messages = make_poller_events()
@@ -184,6 +185,10 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
 
     messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
     assert len(messages) == 3
+
+    # Verify that the region is properly propagated through:
+    for m in messages:
+        assert cloudwatch.get_region(json.loads(m['Body'])) == 'us-east-1'
 
 
 def test_differ(current_security_group_table, durable_security_group_table, mock_lambda_environment):
