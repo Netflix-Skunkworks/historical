@@ -176,7 +176,7 @@ class EventFactory(Factory):
 
 class Detail(object):
     def __init__(self, eventTime, awsEventType, awsRegion, eventName, userIdentity, id, eventSource,
-                 requestParameters, responseElements):
+                 requestParameters, responseElements, collected=None):
         self.eventTime = eventTime
         self.awsRegion = awsRegion
         self.awsEventType = awsEventType
@@ -186,6 +186,7 @@ class Detail(object):
         self.requestParameters = requestParameters
         self.responseElements = responseElements
         self.eventName = eventName
+        self.collected = collected
 
 
 class DetailFactory(Factory):
@@ -201,6 +202,7 @@ class DetailFactory(Factory):
     responseElements = dict()
     eventSource = 'aws.ec2'
     awsRegion = 'us-east-1'
+    collected = None
 
 
 class CloudwatchEvent(Event):

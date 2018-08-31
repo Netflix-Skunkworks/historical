@@ -63,7 +63,7 @@ class VPCPollingEventDetail(HistoricalPollingEventDetail):
     @post_dump
     def add_required_vpc_polling_data(self, data):
         data['eventSource'] = 'historical.ec2.poller'
-        data['eventName'] = 'HistoricalPoller'
+        data['eventName'] = 'Poller'
         return data
 
 

@@ -67,28 +67,52 @@ def poller_processor_handler(event, context):
     """
     log.debug('[@] Running Poller...')
 
-    queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalSecurityGroupPoller'))
+    collector_poller_queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalSecurityGroupPoller'))
+    takser_queue_url = get_queue_url(os.environ.get('POLLER_TASKER_QUEUE_NAME', 'HistoricalSecurityGroupPollerTasker'))
 
+    poller_task_schema = HistoricalPollerTaskEventModel()
     records = deserialize_records(event['Records'])
 
     for record in records:
         # Skip accounts that have role assumption errors:
         try:
-            groups = describe_security_groups(
-                account_number=record['account_id'],
-                assume_role=HISTORICAL_ROLE,
-                region=record['region']
-            )
-            # TODO Refactor this so that it actually works properly and doesn't spam the AWS API with
-            # un-necessary calls.
+            # Did we get a NextToken?
+            if record.get('NextToken'):
+                log.debug(f"[@] Received pagination token: {record['NextToken']}")
+                groups = describe_security_groups(
+                    account_number=record['account_id'],
+                    assume_role=HISTORICAL_ROLE,
+                    region=record['region'],
+                    MaxResults=200,
+                    NextToken=record['NextToken']
+                )
+            else:
+                groups = describe_security_groups(
+                    account_number=record['account_id'],
+                    assume_role=HISTORICAL_ROLE,
+                    region=record['region'],
+                    MaxResults=200
+                )
+
+            # FIRST THINGS FIRST: Did we get a `NextToken`? If so, we need to enqueue that ASAP because
+            # 'NextToken`s expire in 60 seconds!
+            if groups.get('NextToken'):
+                produce_events(
+                    [poller_task_schema.serialize_me(record['account_id'], record['region'],
+                                                     next_token=groups['NextToken'])],
+                    takser_queue_url
+                )
+
+            # Task the collector to perform all the DDB logic -- this will pass in the collected data to the
+            # collector in very small batches.
             events = [security_group_polling_schema.serialize(record['account_id'], g, record['region'])
                       for g in groups['SecurityGroups']]
-            produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
+            produce_events(events, collector_poller_queue_url, batch_size=3)
 
-            log.debug('[@] Finished generating polling events. Account: {}/{} '
-                      'Events Created: {}'.format(record['account_id'], record['region'], len(events)))
+            log.debug(f"[@] Finished generating polling events. Account: {record['account_id']}/{record['region']} "
+                      f"Events Created: {len(events)}")
         except ClientError as e:
-            log.error('[X] Unable to generate events for account/region. Account Id/Region: {account_id}/{region}'
-                      ' Reason: {reason}'.format(account_id=record['account_id'], region=record['region'], reason=e))
+            log.error(f"[X] Unable to generate events for account/region. Account Id/Region: {record['account_id']}"
+                      f"/{record['region']} Reason: {e}")
 
-        log.debug('[@] Finished generating polling events. Events Created: {}'.format(len(record['account_id'])))
+        log.debug(f"[@] Finished generating polling events. Events Created: {len(record['account_id'])}")

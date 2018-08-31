@@ -109,7 +109,7 @@ def test_schema_serialization():
     loaded_data = s3_polling_schema.loads(serialized).data
 
     assert loaded_serialized["version"] == loaded_data["version"] == "1"
-    assert loaded_serialized["detail-type"] == loaded_data["detail_type"] == "Historical Polling Event"
+    assert loaded_serialized["detail-type"] == loaded_data["detail_type"] == "Poller"
     assert loaded_serialized["source"] == loaded_data["source"] == "historical"
     assert loaded_serialized["account"] == loaded_data["account"] == "012345678910"
 

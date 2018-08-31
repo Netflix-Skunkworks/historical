@@ -57,7 +57,7 @@ class SecurityGroupPollingEventDetail(HistoricalPollingEventDetail):
     @post_dump
     def add_required_security_group_polling_data(self, data):
         data['eventSource'] = 'historical.ec2.poller'
-        data['eventName'] = 'HistoricalPoller'
+        data['eventName'] = 'Poller'
         return data
 
 
@@ -70,13 +70,16 @@ class SecurityGroupPollingEventModel(HistoricalPollingBaseModel):
         return data
 
     def serialize(self, account, group, region):
+        group_id = group.pop('GroupId')
+
         return self.dumps({
             'account': account,
             'detail': {
                 'request_parameters': {
-                    'groupId': group['GroupId']
+                    'groupId': group_id
                 },
-                'region': region
+                'region': region,
+                'collected': group
             }
         }).data
 

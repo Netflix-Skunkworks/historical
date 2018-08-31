@@ -63,6 +63,11 @@ def get_account_id(event):
     return event['account']
 
 
+def get_collected_details(event):
+    """Gets collected details if the technology's poller already described the given asset"""
+    return event['detail'].get('collected')
+
+
 def get_historical_base_info(event):
     data = {
         'principalId': get_principal(event),

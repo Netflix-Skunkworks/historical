@@ -31,7 +31,7 @@ UPDATE_EVENTS = [
     'RevokeSecurityGroupEgress',
     'RevokeSecurityGroupIngress',
     'CreateSecurityGroup',
-    'HistoricalPoller'
+    'Poller'
 ]
 
 DELETE_EVENTS = [
@@ -54,6 +54,11 @@ def describe_group(record, region):
     group_name = cloudwatch.filter_request_parameters('groupName', record)
     vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
     group_id = cloudwatch.filter_request_parameters('groupId', record, look_in_response=True)
+
+    # Did this get collected already by the poller?
+    if cloudwatch.get_collected_details(record):
+        log.debug(f"[<--] Received already collected security group data: {record['detail']['collected']}")
+        return [record['detail']['collected']]
 
     try:
         # Always depend on Group ID first:
