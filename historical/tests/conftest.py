@@ -101,6 +101,7 @@ def swag_accounts(s3, retry):
         'owner': 'third-party',
         'provider': 'aws',
         'sensitive': False,
+        'account_status': 'ready',
         'services': [
             {
                 'name': 'historical',

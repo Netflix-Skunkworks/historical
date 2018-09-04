@@ -278,6 +278,7 @@ def test_get_only_test_accounts(swag_accounts):
         'owner': 'third-party',
         'provider': 'aws',
         'sensitive': False,
+        'account_status': 'ready',
         'services': [
             {
                 'name': 'historical',
@@ -314,3 +315,9 @@ def test_get_only_test_accounts(swag_accounts):
     os.environ['TEST_ACCOUNTS_ONLY'] = 'false'
     result = get_historical_accounts()
     assert len(result) == 2
+
+    # Make sure that disabled/deleted accounts are not in the results:
+    account['account_status'] = 'deleted'
+    swag.update(account)
+    result = get_historical_accounts()
+    assert len(result) == 1
