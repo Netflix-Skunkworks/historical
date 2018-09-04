@@ -88,5 +88,3 @@ def poller_processor_handler(event, context):
         except ClientError as e:
             log.error('[X] Unable to generate events for account/region. Account Id/Region: {account_id}/{region}'
                       ' Reason: {reason}'.format(account_id=record['account_id'], region=record['region'], reason=e))
-
-        log.debug('[@] Finished generating polling events. Events Created: {}'.format(len(record['account_id'])))
