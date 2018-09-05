@@ -6,7 +6,6 @@
 .. author:: Mike Grima <mgrima@netflix.com>
 """
 from marshmallow import Schema, fields, post_dump
-from pynamodb.models import Model
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, MapAttribute
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 
@@ -25,13 +24,13 @@ class S3Model(object):
     Tags = MapAttribute()
 
 
-class DurableS3Model(Model, DurableHistoricalModel, AWSHistoricalMixin, S3Model):
+class DurableS3Model(DurableHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3DurableTable'
         region = CURRENT_REGION
 
 
-class CurrentS3Model(Model, CurrentHistoricalModel, AWSHistoricalMixin, S3Model):
+class CurrentS3Model(CurrentHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3CurrentTable'
         region = CURRENT_REGION

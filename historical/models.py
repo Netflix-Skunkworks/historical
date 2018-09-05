@@ -10,9 +10,11 @@ import time
 from datetime import datetime
 
 from marshmallow import Schema, fields
+from pynamodb.models import Model
+
 from historical.attributes import EventTimeAttribute, HistoricalDecimalAttribute
 
-from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute
+from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute, ListAttribute
 
 from historical.constants import TTL_EXPIRY
 
@@ -28,17 +30,36 @@ def default_event_time():
     return datetime.utcnow().replace(tzinfo=None, microsecond=0).isoformat() + 'Z'
 
 
-class DurableHistoricalModel(object):
+class BaseHistoricalModel(Model):
+    """Helper for serializing into a typical `dict`.  See: https://github.com/pynamodb/PynamoDB/issues/152"""
+    def __iter__(self):
+        for name, attr in self.get_attributes().items():
+            try:
+                if isinstance(attr, MapAttribute):
+                    yield name, getattr(self, name).as_dict()
+                elif isinstance(attr, NumberAttribute) or isinstance(attr, HistoricalDecimalAttribute):
+                    yield name, int(attr.serialize(getattr(self, name)))
+                elif isinstance(attr, ListAttribute):
+                    yield name, [el.as_dict() for el in getattr(self, name)]
+                else:
+                    yield name, attr.serialize(getattr(self, name))
+
+            # For Nulls:
+            except AttributeError:
+                yield name, None
+
+
+class DurableHistoricalModel(BaseHistoricalModel):
     eventTime = EventTimeAttribute(range_key=True, default=default_event_time)
 
 
-class CurrentHistoricalModel(object):
+class CurrentHistoricalModel(BaseHistoricalModel):
     eventTime = EventTimeAttribute(default=default_event_time)
     ttl = NumberAttribute(default=default_ttl())
     eventSource = UnicodeAttribute()
 
 
-class AWSHistoricalMixin(object):
+class AWSHistoricalMixin(BaseHistoricalModel):
     arn = UnicodeAttribute(hash_key=True)
     accountId = UnicodeAttribute()
     userIdentity = MapAttribute(null=True)
