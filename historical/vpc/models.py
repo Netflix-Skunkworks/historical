@@ -7,7 +7,6 @@
 """
 from marshmallow import Schema, fields, post_dump
 
-from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, BooleanAttribute, MapAttribute
 
@@ -34,13 +33,13 @@ class VPCModel(object):
     Region = UnicodeAttribute()
 
 
-class DurableVPCModel(Model, DurableHistoricalModel, AWSHistoricalMixin, VPCModel):
+class DurableVPCModel(DurableHistoricalModel, AWSHistoricalMixin, VPCModel):
     class Meta:
         table_name = 'HistoricalVPCDurableTable'
         region = CURRENT_REGION
 
 
-class CurrentVPCModel(Model, CurrentHistoricalModel, AWSHistoricalMixin, VPCModel):
+class CurrentVPCModel(CurrentHistoricalModel, AWSHistoricalMixin, VPCModel):
     class Meta:
         table_name = 'HistoricalVPCCurrentTable'
         region = CURRENT_REGION

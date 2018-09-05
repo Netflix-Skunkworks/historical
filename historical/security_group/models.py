@@ -5,9 +5,8 @@
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
 """
-from marshmallow import Schema, fields, post_dump
+from marshmallow import fields, post_dump
 
-from pynamodb.models import Model
 from pynamodb.indexes import GlobalSecondaryIndex, AllProjection
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute, MapAttribute
 
@@ -31,13 +30,13 @@ class SecurityGroupModel(object):
     Region = UnicodeAttribute()
 
 
-class DurableSecurityGroupModel(Model, DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
+class DurableSecurityGroupModel(DurableHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupDurableTable'
         region = CURRENT_REGION
 
 
-class CurrentSecurityGroupModel(Model, CurrentHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
+class CurrentSecurityGroupModel(CurrentHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupCurrentTable'
         region = CURRENT_REGION

@@ -321,3 +321,16 @@ def test_get_only_test_accounts(swag_accounts):
     swag.update(account)
     result = get_historical_accounts()
     assert len(result) == 1
+
+
+def test_serialization():
+    from historical.s3.models import CurrentS3Model
+
+    bucket = S3_BUCKET.copy()
+    bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+
+    bucket = CurrentS3Model(**bucket)
+    dictionary = dict(bucket)
+
+    assert dictionary['version'] == VERSION
+    assert dictionary['configuration']['LifecycleRules'][0]['Prefix'] is None
