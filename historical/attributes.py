@@ -67,6 +67,30 @@ def decimal_default(obj):
     raise TypeError
 
 
+def fix_decimals(obj):
+    """Removes the stupid Decimals
+       See: https://github.com/boto/boto3/issues/369#issuecomment-302137290
+    """
+    if isinstance(obj, list):
+        for i in range(len(obj)):
+            obj[i] = fix_decimals(obj[i])
+        return obj
+
+    elif isinstance(obj, dict):
+        for key, value in obj.items():
+            obj[key] = fix_decimals(value)
+        return obj
+
+    elif isinstance(obj, decimal.Decimal):
+        if obj % 1 == 0:
+            return int(obj)
+        else:
+            return float(obj)
+
+    else:
+        return obj
+
+
 class HistoricalDecimalAttribute(Attribute):
     """
     A number attribute

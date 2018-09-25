@@ -27,7 +27,6 @@ class VPCModel(object):
     VpcId = UnicodeAttribute()
     State = UnicodeAttribute()
     CidrBlock = UnicodeAttribute()
-    Tags = MapAttribute()
     IsDefault = BooleanAttribute()
     Name = UnicodeAttribute(null=True)
     Region = UnicodeAttribute()
@@ -37,12 +36,14 @@ class DurableVPCModel(DurableHistoricalModel, AWSHistoricalMixin, VPCModel):
     class Meta:
         table_name = 'HistoricalVPCDurableTable'
         region = CURRENT_REGION
+        tech = 'vpc'
 
 
 class CurrentVPCModel(CurrentHistoricalModel, AWSHistoricalMixin, VPCModel):
     class Meta:
         table_name = 'HistoricalVPCCurrentTable'
         region = CURRENT_REGION
+        tech = 'vpc'
 
 
 class ViewIndex(GlobalSecondaryIndex):

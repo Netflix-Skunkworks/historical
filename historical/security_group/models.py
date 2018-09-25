@@ -26,7 +26,6 @@ class SecurityGroupModel(object):
     GroupId = UnicodeAttribute()
     GroupName = UnicodeAttribute()
     VpcId = UnicodeAttribute(null=True)
-    Tags = MapAttribute()
     Region = UnicodeAttribute()
 
 
@@ -34,12 +33,14 @@ class DurableSecurityGroupModel(DurableHistoricalModel, AWSHistoricalMixin, Secu
     class Meta:
         table_name = 'HistoricalSecurityGroupDurableTable'
         region = CURRENT_REGION
+        tech = 'securitygroup'
 
 
 class CurrentSecurityGroupModel(CurrentHistoricalModel, AWSHistoricalMixin, SecurityGroupModel):
     class Meta:
         table_name = 'HistoricalSecurityGroupCurrentTable'
         region = CURRENT_REGION
+        tech = 'securitygroup'
 
 
 class ViewIndex(GlobalSecondaryIndex):

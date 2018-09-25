@@ -9,6 +9,8 @@
 import logging
 import os
 
+from enum import Enum
+
 log_levels = {
     'CRITICAL': logging.CRITICAL,
     'ERROR': logging.ERROR,
@@ -33,5 +35,14 @@ HISTORICAL_ROLE = os.environ.get('HISTORICAL_ROLE', 'Historical')
 POLL_REGIONS = os.environ.get('POLL_REGIONS', 'us-east-1').split(",")
 PROXY_REGIONS = os.environ.get('PROXY_REGIONS', 'us-east-1').split(",")
 REGION_ATTR = os.environ.get('REGION_ATTR', 'Region')
+SIMPLE_DURABLE_PROXY = os.environ.get('SIMPLE_DURABLE_PROXY', False)
 LOGGING_LEVEL = extract_log_level_from_environment('LOGGING_LEVEL', logging.INFO)
 EVENT_TOO_BIG_FLAG = "event_too_big"
+
+
+class DurableEventTypes(Enum):
+    CREATE = 'CREATE'
+    UPDATE = 'UPDATE'
+    DELETE = 'DELETE'
+    # EXPIRE = 'EXPIRE'  # Future TTLs on Durable tables??
+
