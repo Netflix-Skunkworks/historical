@@ -16,11 +16,10 @@ from retrying import retry
 
 from raven_python_lambda import RavenLambdaWrapper
 
-from historical.common.dynamodb import deserialize_durable_record_to_durable_model, \
-    remove_global_dynamo_specific_fields, deser
+from historical.common.dynamodb import remove_global_dynamo_specific_fields, deser
 from historical.common.exceptions import MissingProxyConfigurationException
 from historical.common.sqs import produce_events
-from historical.constants import CURRENT_REGION, DurableEventTypes, REGION_ATTR, PROXY_REGIONS, EVENT_TOO_BIG_FLAG,\
+from historical.constants import CURRENT_REGION, REGION_ATTR, PROXY_REGIONS, EVENT_TOO_BIG_FLAG,\
     SIMPLE_DURABLE_PROXY
 
 from historical.mapping import DURABLE_MAPPING, HISTORICAL_TECHNOLOGY
@@ -89,11 +88,27 @@ def handler(event, context):
     record_maker = make_proper_simple_record if SIMPLE_DURABLE_PROXY else make_proper_dynamodb_record
 
     for record in event['Records']:
-        item = record_maker(record, force_shrink=force_shrink)
+        # We should NOT be processing this if the item in question does not
+        # reside in the PROXY_REGIONS
+        correct_region = True
+        for img in ['NewImage', 'OldImage']:
+            if record['dynamodb'].get(img):
+                if record['dynamodb'][img][REGION_ATTR]['S'] not in PROXY_REGIONS:
+                    log.debug("[/] Not processing record -- record event took place in: {}".format(
+                        record['dynamodb'][img][REGION_ATTR]['S']))
+                    correct_region = False
+                    break
 
-        # If there are no items, don't append anything:
-        if item:
-            items_to_ship.append(item)
+        if not correct_region:
+            continue
+
+        # Global DynamoDB tables will update a record with the global table specific fields. This creates 2 events
+        # whenever there is an update. The second update, which is a MODIFY event is not relevant and noise. This
+        # needs to be skipped over to prevent duplicated events. This is a "gotcha" in Global DynamoDB tables.
+        if detect_global_table_updates(record):
+            continue
+
+        items_to_ship.append(record_maker(record, force_shrink=force_shrink))
 
     if items_to_ship:
         # SQS:
@@ -107,6 +122,25 @@ def handler(event, context):
                 _publish_sns_message(client, i, topic_arn)
 
 
+def detect_global_table_updates(record):
+    """This will detect DDB Global Table updates that are not relevant to application data updates. These need to be
+       skipped over as they are pure noise.
+
+    :param record:
+    :return:
+    """
+    # This only affects MODIFY events.
+    if record['eventName'] == 'MODIFY':
+        # Need to compare the old and new images to check for GT specific changes only (just pop off the GT fields)
+        old_image = remove_global_dynamo_specific_fields(record['dynamodb']['OldImage'])
+        new_image = remove_global_dynamo_specific_fields(record['dynamodb']['NewImage'])
+
+        if json.dumps(old_image, sort_keys=True) == json.dumps(new_image, sort_keys=True):
+            return True
+
+    return False
+
+
 def make_proper_dynamodb_record(record, force_shrink=False):
     """Prepares and ships an individual DynamoDB record over to SNS/SQS for future processing.
 
@@ -114,15 +148,6 @@ def make_proper_dynamodb_record(record, force_shrink=False):
     :param force_shrink:
     :return:
     """
-    # We should NOT be processing this if the item in question does not
-    # reside in the PROXY_REGIONS
-    for img in ['NewImage', 'OldImage']:
-        if record['dynamodb'].get(img):
-            if record['dynamodb'][img][REGION_ATTR]['S'] not in PROXY_REGIONS:
-                log.debug("[/] Not processing record -- record event took place in: {}".format(
-                    record['dynamodb'][img][REGION_ATTR]['S']))
-                return
-
     # Get the initial blob and determine if it is too big for SNS/SQS:
     blob = json.dumps(record)
     size = math.ceil(sys.getsizeof(blob) / 1024)
@@ -162,15 +187,6 @@ def make_proper_simple_record(record, force_shrink=False):
     :param force_shrink:
     :return:
     """
-    # We should NOT be processing this if the item in question does not
-    # reside in the PROXY_REGIONS
-    for img in ['NewImage', 'OldImage']:
-        if record['dynamodb'].get(img):
-            if record['dynamodb'][img][REGION_ATTR]['S'] not in PROXY_REGIONS:
-                log.debug("[/] Not processing record -- record event took place in: {}".format(
-                    record['dynamodb'][img][REGION_ATTR]['S']))
-                return
-
     # Convert to a simple object
     item = {
         'arn': record['dynamodb']['Keys']['arn']['S'],
@@ -178,28 +194,11 @@ def make_proper_simple_record(record, force_shrink=False):
         'tech': HISTORICAL_TECHNOLOGY
     }
 
-    # Get the proper event type:
-    if not (record['dynamodb']['NewImage'].get('configuration', {}) or {}).get('M'):
-        item['event'] = DurableEventTypes.DELETE.value
-
-    elif not record['dynamodb'].get('OldImage'):
-        item['event'] = DurableEventTypes.CREATE.value
-
-    else:
-        item['event'] = DurableEventTypes.UPDATE.value
-
     # We need to de-serialize the raw DynamoDB object into the proper PynamoDB obj:
     prepped_new_record = _get_durable_pynamo_obj(record['dynamodb']['NewImage'],
                                                  DURABLE_MAPPING.get(HISTORICAL_TECHNOLOGY))
 
-    if record['dynamodb'].get('OldImage') or {}:
-        prepped_old_record = _get_durable_pynamo_obj(record['dynamodb']['OldImage'],
-                                                     DURABLE_MAPPING.get(HISTORICAL_TECHNOLOGY))
-    else:
-        prepped_old_record = {}
-
-    item['new_image'] = dict(prepped_new_record)
-    item['old_image'] = dict(prepped_old_record)
+    item['item'] = dict(prepped_new_record)
 
     # Get the initial blob and determine if it is too big for SNS/SQS:
     blob = json.dumps(item)
@@ -208,8 +207,7 @@ def make_proper_simple_record(record, force_shrink=False):
     # If it is too big, then we need to send over a smaller blob to inform the recipient that it needs to go out and
     # fetch the item from the Historical table!
     if size >= 200 or force_shrink:
-        del item['new_image']
-        del item['old_image']
+        del item['item']
 
         item[EVENT_TOO_BIG_FLAG] = True
 
