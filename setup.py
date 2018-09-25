@@ -29,7 +29,7 @@ install_requires = [
     'deepdiff>=3.3.0',
     'raven-python-lambda>=0.1.7',
     'marshmallow>=2.13.5',
-    'swag-client==0.4.2',
+    'swag-client==0.4.3',
     'python-dateutil==2.6.1'
 ]
 

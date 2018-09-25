@@ -19,7 +19,6 @@ deser = TypeDeserializer()
 
 log = logging.getLogger('historical')
 
-
 '''
 Important compatibility note:
 -------------------------
@@ -112,7 +111,7 @@ def delete_differ_record(old_image, durable_model):
     log.debug('[+] Adding deletion marker.')
 
 
-def get_full_current_object(record, current_model):
+def get_full_current_object(arn, current_model):
     """
     Utility method to fetch items from the Current table if they are too big for SNS/SQS.
 
@@ -120,7 +119,6 @@ def get_full_current_object(record, current_model):
     :param current_model:
     :return:
     """
-    arn = record['dynamodb']['Keys']['arn']['S']
     log.debug('[-->] Item with ARN: {} was too big for SNS -- fetching it from the Current table...'.format(arn))
     item = list(current_model.query(arn))
 
@@ -132,12 +130,10 @@ def get_full_current_object(record, current_model):
 
     # We need to place the real configuration data into the record so it can be deserialized into
     # the current model correctly:
-    record['dynamodb']['NewImage']['configuration'] = item[0]._serialize()['attributes']['configuration']
-
-    return record
+    return item[0]
 
 
-def get_full_durable_object(record, durable_model):
+def get_full_durable_object(arn, event_time, durable_model):
     """
     Utility method to fetch items from the Durable table if they are too big for SNS/SQS.
 
@@ -145,8 +141,6 @@ def get_full_durable_object(record, durable_model):
     :param durable_model:
     :return:
     """
-    arn = record['dynamodb']['Keys']['arn']['S']
-    event_time = record['dynamodb']['NewImage']['eventTime']['S']
     log.debug('[-->] Item with ARN: {} was too big for SNS -- fetching it from the Durable table...'.format(arn))
     item = list(durable_model.query(arn, durable_model.eventTime == event_time))
 
@@ -158,9 +152,7 @@ def get_full_durable_object(record, durable_model):
 
     # We need to place the real configuration data into the record so it can be deserialized into
     # the durable model correctly:
-    record['dynamodb']['NewImage']['configuration'] = item[0]._serialize()['attributes']['configuration']
-
-    return record
+    return item[0]
 
 
 def deserialize_current_record_to_durable_model(record, current_model, durable_model):
@@ -175,10 +167,21 @@ def deserialize_current_record_to_durable_model(record, current_model, durable_m
     """
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
     if record.get(EVENT_TOO_BIG_FLAG):
-        record = get_full_current_object(record, current_model)
+        record = get_full_current_object(record['dynamodb']['Keys']['arn']['S'], current_model)
 
         if not record:
             return None
+
+        serialized = record._serialize()
+
+        record = {
+            'dynamodb': {
+                'NewImage': serialized['attributes']
+            }
+        }
+
+        # The ARN isn't added because it's in the HASH key section:
+        record['dynamodb']['NewImage']['arn'] = {'S': serialized['HASH']}
 
     new_image = remove_current_specific_fields(record['dynamodb']['NewImage'])
     data = {}
@@ -201,10 +204,7 @@ def deserialize_current_record_to_current_model(record, current_model):
     """
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
     if record.get(EVENT_TOO_BIG_FLAG):
-        record = get_full_current_object(record, current_model)
-
-        if not record:
-            return None
+        return get_full_current_object(record['dynamodb']['Keys']['arn']['S'], current_model)
 
     new_image = remove_global_dynamo_specific_fields(record['dynamodb']['NewImage'])
     data = {}
@@ -227,10 +227,9 @@ def deserialize_durable_record_to_durable_model(record, durable_model):
     """
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
     if record.get(EVENT_TOO_BIG_FLAG):
-        record = get_full_durable_object(record, durable_model)
-
-        if not record:
-            return None
+        return get_full_durable_object(record['dynamodb']['Keys']['arn']['S'],
+                                       record['dynamodb']['NewImage']['eventTime']['S'],
+                                       durable_model)
 
     new_image = remove_global_dynamo_specific_fields(record['dynamodb']['NewImage'])
     data = {}
@@ -251,14 +250,10 @@ def deserialize_durable_record_to_current_model(record, current_model):
     :param current_model:
     :return:
     """
-
     # Was the item in question too big for SNS? If so, then we need to fetch the item from the current Dynamo table:
     if record.get(EVENT_TOO_BIG_FLAG):
         # Try to get the data from the current table vs. grabbing the data from the Durable table:
-        record = get_full_current_object(record, current_model)
-
-        if not record:
-            return None
+        return get_full_current_object(record['dynamodb']['Keys']['arn']['S'], current_model)
 
     new_image = remove_durable_specific_fields(record['dynamodb']['NewImage'])
     data = {}

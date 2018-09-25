@@ -12,7 +12,7 @@ from datetime import datetime
 from marshmallow import Schema, fields
 from pynamodb.models import Model
 
-from historical.attributes import EventTimeAttribute, HistoricalDecimalAttribute
+from historical.attributes import EventTimeAttribute, HistoricalDecimalAttribute, fix_decimals
 
 from pynamodb.attributes import UnicodeAttribute, MapAttribute, NumberAttribute, ListAttribute
 
@@ -36,11 +36,13 @@ class BaseHistoricalModel(Model):
         for name, attr in self.get_attributes().items():
             try:
                 if isinstance(attr, MapAttribute):
-                    yield name, getattr(self, name).as_dict()
+                    name, obj = name, getattr(self, name).as_dict()
+                    yield name, fix_decimals(obj)  # Don't forget to remove the stupid decimals :/
                 elif isinstance(attr, NumberAttribute) or isinstance(attr, HistoricalDecimalAttribute):
                     yield name, int(attr.serialize(getattr(self, name)))
                 elif isinstance(attr, ListAttribute):
-                    yield name, [el.as_dict() for el in getattr(self, name)]
+                    name, obj = name, [el.as_dict() for el in getattr(self, name)]
+                    yield name, fix_decimals(obj)  # Don't forget to remove the stupid decimals :/
                 else:
                     yield name, attr.serialize(getattr(self, name))
 
@@ -62,13 +64,14 @@ class CurrentHistoricalModel(BaseHistoricalModel):
 class AWSHistoricalMixin(BaseHistoricalModel):
     arn = UnicodeAttribute(hash_key=True)
     accountId = UnicodeAttribute()
+    configuration = MapAttribute()
+    Tags = MapAttribute()
+    version = HistoricalDecimalAttribute()
     userIdentity = MapAttribute(null=True)
     principalId = UnicodeAttribute(null=True)
-    configuration = MapAttribute(null=True)
     userAgent = UnicodeAttribute(null=True)
     sourceIpAddress = UnicodeAttribute(null=True)
     requestParameters = MapAttribute(null=True)
-    version = HistoricalDecimalAttribute()
 
 
 class HistoricalPollingEventDetail(Schema):

@@ -16,9 +16,14 @@ from retrying import retry
 
 from raven_python_lambda import RavenLambdaWrapper
 
+from historical.common.dynamodb import deserialize_durable_record_to_durable_model, \
+    remove_global_dynamo_specific_fields, deser
 from historical.common.exceptions import MissingProxyConfigurationException
 from historical.common.sqs import produce_events
-from historical.constants import CURRENT_REGION, REGION_ATTR, PROXY_REGIONS, EVENT_TOO_BIG_FLAG
+from historical.constants import CURRENT_REGION, DurableEventTypes, REGION_ATTR, PROXY_REGIONS, EVENT_TOO_BIG_FLAG,\
+    SIMPLE_DURABLE_PROXY
+
+from historical.mapping import DURABLE_MAPPING, HISTORICAL_TECHNOLOGY
 
 log = logging.getLogger('historical')
 
@@ -79,8 +84,12 @@ def handler(event, context):
     # Must ALWAYS shrink for SQS because of 256KB limit of sending batched messages
     force_shrink = True if queue_url else False
 
+    # Is this a "Simple Durable Proxy" -- that is -- are we stripping out all of the DynamoDB data from
+    # the Differ?
+    record_maker = make_proper_simple_record if SIMPLE_DURABLE_PROXY else make_proper_dynamodb_record
+
     for record in event['Records']:
-        item = make_proper_record(record, force_shrink=force_shrink)
+        item = record_maker(record, force_shrink=force_shrink)
 
         # If there are no items, don't append anything:
         if item:
@@ -98,8 +107,8 @@ def handler(event, context):
                 _publish_sns_message(client, i, topic_arn)
 
 
-def make_proper_record(record, force_shrink=False):
-    """Prepares and ships an individual record over to SNS/SQS for future processing.
+def make_proper_dynamodb_record(record, force_shrink=False):
+    """Prepares and ships an individual DynamoDB record over to SNS/SQS for future processing.
 
     :param record:
     :param force_shrink:
@@ -114,13 +123,13 @@ def make_proper_record(record, force_shrink=False):
                     record['dynamodb'][img][REGION_ATTR]['S']))
                 return
 
+    # Get the initial blob and determine if it is too big for SNS/SQS:
     blob = json.dumps(record)
     size = math.ceil(sys.getsizeof(blob) / 1024)
 
+    # If it is too big, then we need to send over a smaller blob to inform the recipient that it needs to go out and
+    # fetch the item from the Historical table!
     if size >= 200 or force_shrink:
-        # Need to send over a smaller blob to inform the recipient that it needs to go out and
-        # fetch the item from the Historical table!
-
         deletion = False
         # ^^ However -- deletions need to be handled differently, because the Differ won't be able to find a
         # deleted record. For deletions, we will only shrink the 'OldImage', but preserve the 'NewImage' since that is
@@ -131,5 +140,79 @@ def make_proper_record(record, force_shrink=False):
                 deletion = True
 
         blob = json.dumps(shrink_blob(record, deletion))
+
+    return blob
+
+
+def _get_durable_pynamo_obj(record_data, durable_model):
+    image = remove_global_dynamo_specific_fields(record_data)
+    data = {}
+
+    for item, value in image.items():
+        # This could end up as loss of precision
+        data[item] = deser.deserialize(value)
+
+    return durable_model(**data)
+
+
+def make_proper_simple_record(record, force_shrink=False):
+    """Prepares and ships an individual simplified durable table record over to SNS/SQS for future processing.
+
+    :param record:
+    :param force_shrink:
+    :return:
+    """
+    # We should NOT be processing this if the item in question does not
+    # reside in the PROXY_REGIONS
+    for img in ['NewImage', 'OldImage']:
+        if record['dynamodb'].get(img):
+            if record['dynamodb'][img][REGION_ATTR]['S'] not in PROXY_REGIONS:
+                log.debug("[/] Not processing record -- record event took place in: {}".format(
+                    record['dynamodb'][img][REGION_ATTR]['S']))
+                return
+
+    # Convert to a simple object
+    item = {
+        'arn': record['dynamodb']['Keys']['arn']['S'],
+        'event_time': record['dynamodb']['NewImage']['eventTime']['S'],
+        'tech': HISTORICAL_TECHNOLOGY
+    }
+
+    # Get the proper event type:
+    if not (record['dynamodb']['NewImage'].get('configuration', {}) or {}).get('M'):
+        item['event'] = DurableEventTypes.DELETE.value
+
+    elif not record['dynamodb'].get('OldImage'):
+        item['event'] = DurableEventTypes.CREATE.value
+
+    else:
+        item['event'] = DurableEventTypes.UPDATE.value
+
+    # We need to de-serialize the raw DynamoDB object into the proper PynamoDB obj:
+    prepped_new_record = _get_durable_pynamo_obj(record['dynamodb']['NewImage'],
+                                                 DURABLE_MAPPING.get(HISTORICAL_TECHNOLOGY))
+
+    if record['dynamodb'].get('OldImage') or {}:
+        prepped_old_record = _get_durable_pynamo_obj(record['dynamodb']['OldImage'],
+                                                     DURABLE_MAPPING.get(HISTORICAL_TECHNOLOGY))
+    else:
+        prepped_old_record = {}
+
+    item['new_image'] = dict(prepped_new_record)
+    item['old_image'] = dict(prepped_old_record)
+
+    # Get the initial blob and determine if it is too big for SNS/SQS:
+    blob = json.dumps(item)
+    size = math.ceil(sys.getsizeof(blob) / 1024)
+
+    # If it is too big, then we need to send over a smaller blob to inform the recipient that it needs to go out and
+    # fetch the item from the Historical table!
+    if size >= 200 or force_shrink:
+        del item['new_image']
+        del item['old_image']
+
+        item[EVENT_TOO_BIG_FLAG] = True
+
+        blob = json.dumps(item)
 
     return blob

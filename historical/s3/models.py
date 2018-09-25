@@ -21,19 +21,20 @@ VERSION = 9
 class S3Model(object):
     BucketName = UnicodeAttribute()
     Region = UnicodeAttribute()
-    Tags = MapAttribute()
 
 
 class DurableS3Model(DurableHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3DurableTable'
         region = CURRENT_REGION
+        tech = 's3'
 
 
 class CurrentS3Model(CurrentHistoricalModel, AWSHistoricalMixin, S3Model):
     class Meta:
         table_name = 'HistoricalS3CurrentTable'
         region = CURRENT_REGION
+        tech = 's3'
 
 
 class ViewIndex(GlobalSecondaryIndex):

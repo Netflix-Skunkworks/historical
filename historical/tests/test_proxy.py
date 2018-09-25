@@ -18,7 +18,7 @@ from mock import MagicMock
 
 from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.models import TTL_EXPIRY
-from historical.s3.models import VERSION
+from historical.s3.models import VERSION, DurableS3Model
 from historical.tests.factories import DynamoDBRecordFactory, DynamoDBDataFactory, DynamoDBRecordsFactory, serialize, \
     CloudwatchEventFactory, DetailFactory, RecordsFactory, SQSDataFactory, SnsDataFactory
 
@@ -105,7 +105,7 @@ def test_make_blob():
     assert not shrunken_blob['dynamodb']['OldImage'].get('configuration')
 
 
-def test_make_proper_record():
+def test_make_proper_dynamodb_record():
     import historical.common.proxy
 
     old_publish_message = historical.common.proxy._publish_sns_message
@@ -114,7 +114,7 @@ def test_make_proper_record():
     mock_logger = MagicMock()
     historical.common.proxy.log = mock_logger
 
-    from historical.common.proxy import make_proper_record
+    from historical.common.proxy import make_proper_dynamodb_record
 
     # With a small item:
     ttl = int(time.time() + TTL_EXPIRY)
@@ -132,13 +132,13 @@ def test_make_proper_record():
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
-    # Nothing changed -- should be exactly the same:
-    test_blob = json.dumps(json.loads(make_proper_record(data)), sort_keys=True)
+    test_blob = json.dumps(json.loads(make_proper_dynamodb_record(data)), sort_keys=True)
     assert test_blob == json.dumps(data, sort_keys=True)
     assert not json.loads(test_blob).get(EVENT_TOO_BIG_FLAG)
     assert not mock_logger.debug.called
 
     # With a big item...
+    new_bucket['configuration'] = new_bucket['configuration'].copy()
     new_bucket['configuration']['VeryLargeConfigItem'] = 'a' * 262144
     ddb_record = DynamoDBRecordFactory(
         dynamodb=DynamoDBDataFactory(
@@ -152,7 +152,7 @@ def test_make_proper_record():
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
 
     assert math.ceil(sys.getsizeof(json.dumps(data)) / 1024) >= 200
-    test_blob = json.dumps(json.loads(make_proper_record(data)), sort_keys=True)
+    test_blob = json.dumps(json.loads(make_proper_dynamodb_record(data)), sort_keys=True)
     assert test_blob != json.dumps(data, sort_keys=True)
     assert json.loads(test_blob)[EVENT_TOO_BIG_FLAG]
     assert not mock_logger.debug.called
@@ -169,7 +169,7 @@ def test_make_proper_record():
         eventName='INSERT')
     new_item = DynamoDBRecordsFactory(records=[ddb_record])
     data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
-    item = make_proper_record(data)
+    item = make_proper_dynamodb_record(data)
     assert not item
     assert mock_logger.debug.called
 
@@ -188,13 +188,139 @@ def test_make_proper_record():
         eventName='INSERT')
     deleted_item = DynamoDBRecordsFactory(records=[ddb_deleted_item])
     data = json.loads(json.dumps(deleted_item, default=serialize))['Records'][0]
-    item = json.loads(make_proper_record(data))
+    item = json.loads(make_proper_dynamodb_record(data))
     assert not item['dynamodb']['OldImage'].get('configuration')
     assert not item['dynamodb']['NewImage']['configuration']['M']
 
     # Unmock:
     historical.common.proxy._publish_sns_message = old_publish_message
     historical.common.proxy.log = old_logger
+
+
+def test_make_proper_simple_record():
+    import historical.common.proxy
+
+    old_tech = historical.common.proxy.HISTORICAL_TECHNOLOGY
+    historical.common.proxy.HISTORICAL_TECHNOLOGY = 's3'
+
+    from historical.common.proxy import make_proper_simple_record, _get_durable_pynamo_obj
+
+    # With a small item:
+    new_bucket = S3_BUCKET.copy()
+    new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+    del new_bucket['eventSource']
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+
+    test_blob = json.loads(make_proper_simple_record(data))
+    assert test_blob['arn'] == new_bucket['arn']
+    assert test_blob['event_time'] == new_bucket['eventTime']
+    assert test_blob['tech'] == 's3'
+    assert not test_blob.get(EVENT_TOO_BIG_FLAG)
+    assert json.dumps(test_blob['new_image'], sort_keys=True) == \
+        json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['NewImage'], DurableS3Model)), sort_keys=True)
+    assert json.dumps(test_blob['old_image'], sort_keys=True) == \
+        json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['OldImage'], DurableS3Model)), sort_keys=True)
+    assert test_blob['event'] == 'UPDATE'
+
+    # With a big item...
+    new_bucket['configuration'] = new_bucket['configuration'].copy()
+    new_bucket['configuration']['VeryLargeConfigItem'] = 'a' * 262144
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+
+    assert math.ceil(sys.getsizeof(json.dumps(data)) / 1024) >= 200
+    test_blob = json.loads(make_proper_simple_record(data))
+    assert test_blob['arn'] == new_bucket['arn']
+    assert test_blob['event_time'] == new_bucket['eventTime']
+    assert test_blob['tech'] == 's3'
+    assert test_blob['event'] == 'UPDATE'
+    assert test_blob[EVENT_TOO_BIG_FLAG]
+    assert not test_blob.get('new_image')
+    assert not test_blob.get('old_image')
+
+    # With a region that is not in the PROXY_REGIONS var:
+    new_bucket['Region'] = "us-west-2"
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+    test_blob = make_proper_simple_record(data)
+    assert not test_blob
+
+    # For a deletion event:
+    deleted_bucket = S3_BUCKET.copy()
+    del deleted_bucket['eventSource']
+    deleted_bucket['Tags'] = {}
+    deleted_bucket['configuration'] = {}
+    new_bucket['Region'] = 'us-east-1'
+    ddb_deleted_item = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=deleted_bucket,
+            Keys={
+                'arn': deleted_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    deleted_item = DynamoDBRecordsFactory(records=[ddb_deleted_item])
+    data = json.loads(json.dumps(deleted_item, default=serialize))['Records'][0]
+    test_blob = json.loads(make_proper_simple_record(data))
+    assert test_blob['arn'] == deleted_bucket['arn']
+    assert test_blob['event_time'] == deleted_bucket['eventTime']
+    assert test_blob['tech'] == 's3'
+    assert test_blob['event'] == 'DELETE'
+    assert test_blob[EVENT_TOO_BIG_FLAG]
+    assert not test_blob.get('new_image')
+    assert not test_blob.get('old_image')
+
+    # For a creation event:
+    new_bucket = S3_BUCKET.copy()
+    new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+    del new_bucket['eventSource']
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            }),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+
+    test_blob = json.loads(make_proper_simple_record(data))
+    assert test_blob['arn'] == new_bucket['arn']
+    assert test_blob['event_time'] == new_bucket['eventTime']
+    assert test_blob['tech'] == 's3'
+    assert test_blob['event'] == 'CREATE'
+    assert not test_blob.get(EVENT_TOO_BIG_FLAG)
+    assert json.dumps(test_blob['new_image'], sort_keys=True) == \
+        json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['NewImage'], DurableS3Model)), sort_keys=True)
+    assert test_blob['old_image'] == {}
+
+    # Unmock:
+    historical.common.proxy.HISTORICAL_TECHNOLOGY = old_tech
 
 
 def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment,
@@ -298,7 +424,7 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
     mocked_logger.error.assert_called_once_with('[?] Received item too big for SNS, and was not able to '
                                                 'find the original item with ARN: arn:aws:s3:::notinthecurrenttable')
 
-    # Now, let's test if we are dealing with a deletion event:
+    # Now, let's test if we are dealing with a deletion event: (this is also an out of order event)
     deleted_bucket = S3_BUCKET.copy()
     deleted_bucket['Tags'] = {}
     deleted_bucket['configuration'] = {}
@@ -311,10 +437,6 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
             OldImage=new_bucket),
         eventName='INSERT')
 
-    data = json.dumps(ddb_deleted_item, default=serialize)
-    data = RecordsFactory(records=[SQSDataFactory(body=data)])
-    data = json.loads(json.dumps(data, default=serialize))
-
     # Get the proper shrunken record:
     shrunken_deletion = json.dumps(shrink_blob(json.loads(json.dumps(ddb_deleted_item, default=serialize)), True))
     records = RecordsFactory(
@@ -326,7 +448,7 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
     diff_handler(records_event, mock_lambda_environment)
 
     # Verify that the existing bucket now has a deletion record:
-    result = list(DurableS3Model.query(deleted_bucket['arn']))
+    result = list(DurableS3Model.query(deleted_bucket['arn'], scan_index_forward=False))
     assert len(result) == 2
     assert result[0].configuration.attribute_values
     assert not result[1].configuration.attribute_values

@@ -6,7 +6,6 @@
 .. author:: Mike Grima <mgrima@netflix.com>
 """
 import logging
-from boto3.dynamodb.types import TypeDeserializer
 from deepdiff import DeepDiff
 
 from raven_python_lambda import RavenLambdaWrapper
@@ -15,8 +14,6 @@ from historical.common.util import deserialize_records
 from historical.constants import LOGGING_LEVEL
 from historical.s3.models import DurableS3Model, CurrentS3Model
 from historical.common.dynamodb import process_dynamodb_differ_record
-
-deser = TypeDeserializer()
 
 logging.basicConfig()
 log = logging.getLogger('historical')
