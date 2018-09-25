@@ -105,6 +105,61 @@ def test_make_blob():
     assert not shrunken_blob['dynamodb']['OldImage'].get('configuration')
 
 
+def test_detect_global_table_updates():
+    from historical.common.dynamodb import remove_global_dynamo_specific_fields
+    from historical.common.proxy import detect_global_table_updates
+
+    new_bucket = S3_BUCKET.copy()
+    new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+
+    old_bucket = dict(new_bucket)
+    new_bucket['aws:rep:deleting'] = 'something'
+    new_bucket['aws:rep:updatetime'] = new_bucket['eventTime']
+    new_bucket['aws:rep:updateregion'] = 'us-east-1'
+
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=old_bucket),
+        eventName='MODIFY')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+    assert detect_global_table_updates(data)
+
+    # If they are both equal:
+    old_bucket = new_bucket
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=old_bucket),
+        eventName='MODIFY')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+    assert detect_global_table_updates(data)
+
+    # An actual tangible change:
+    old_bucket = dict(new_bucket)
+    old_bucket = remove_global_dynamo_specific_fields(old_bucket)
+    old_bucket['Region'] = 'us-west-2'
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=old_bucket),
+        eventName='MODIFY')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+    assert not detect_global_table_updates(data)
+
+
 def test_make_proper_dynamodb_record():
     import historical.common.proxy
 
@@ -156,22 +211,6 @@ def test_make_proper_dynamodb_record():
     assert test_blob != json.dumps(data, sort_keys=True)
     assert json.loads(test_blob)[EVENT_TOO_BIG_FLAG]
     assert not mock_logger.debug.called
-
-    # With a region that is not in the PROXY_REGIONS var:
-    new_bucket['Region'] = "us-west-2"
-    ddb_record = DynamoDBRecordFactory(
-        dynamodb=DynamoDBDataFactory(
-            NewImage=new_bucket,
-            Keys={
-                'arn': new_bucket['arn']
-            },
-            OldImage=new_bucket),
-        eventName='INSERT')
-    new_item = DynamoDBRecordsFactory(records=[ddb_record])
-    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
-    item = make_proper_dynamodb_record(data)
-    assert not item
-    assert mock_logger.debug.called
 
     # For a deletion event:
     deleted_bucket = S3_BUCKET.copy()
@@ -225,11 +264,8 @@ def test_make_proper_simple_record():
     assert test_blob['event_time'] == new_bucket['eventTime']
     assert test_blob['tech'] == 's3'
     assert not test_blob.get(EVENT_TOO_BIG_FLAG)
-    assert json.dumps(test_blob['new_image'], sort_keys=True) == \
+    assert json.dumps(test_blob['item'], sort_keys=True) == \
         json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['NewImage'], DurableS3Model)), sort_keys=True)
-    assert json.dumps(test_blob['old_image'], sort_keys=True) == \
-        json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['OldImage'], DurableS3Model)), sort_keys=True)
-    assert test_blob['event'] == 'UPDATE'
 
     # With a big item...
     new_bucket['configuration'] = new_bucket['configuration'].copy()
@@ -250,25 +286,8 @@ def test_make_proper_simple_record():
     assert test_blob['arn'] == new_bucket['arn']
     assert test_blob['event_time'] == new_bucket['eventTime']
     assert test_blob['tech'] == 's3'
-    assert test_blob['event'] == 'UPDATE'
     assert test_blob[EVENT_TOO_BIG_FLAG]
-    assert not test_blob.get('new_image')
-    assert not test_blob.get('old_image')
-
-    # With a region that is not in the PROXY_REGIONS var:
-    new_bucket['Region'] = "us-west-2"
-    ddb_record = DynamoDBRecordFactory(
-        dynamodb=DynamoDBDataFactory(
-            NewImage=new_bucket,
-            Keys={
-                'arn': new_bucket['arn']
-            },
-            OldImage=new_bucket),
-        eventName='INSERT')
-    new_item = DynamoDBRecordsFactory(records=[ddb_record])
-    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
-    test_blob = make_proper_simple_record(data)
-    assert not test_blob
+    assert not test_blob.get('item')
 
     # For a deletion event:
     deleted_bucket = S3_BUCKET.copy()
@@ -290,10 +309,8 @@ def test_make_proper_simple_record():
     assert test_blob['arn'] == deleted_bucket['arn']
     assert test_blob['event_time'] == deleted_bucket['eventTime']
     assert test_blob['tech'] == 's3'
-    assert test_blob['event'] == 'DELETE'
-    assert test_blob[EVENT_TOO_BIG_FLAG]
-    assert not test_blob.get('new_image')
-    assert not test_blob.get('old_image')
+    assert json.dumps(test_blob['item'], sort_keys=True) == \
+        json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['NewImage'], DurableS3Model)), sort_keys=True)
 
     # For a creation event:
     new_bucket = S3_BUCKET.copy()
@@ -313,11 +330,9 @@ def test_make_proper_simple_record():
     assert test_blob['arn'] == new_bucket['arn']
     assert test_blob['event_time'] == new_bucket['eventTime']
     assert test_blob['tech'] == 's3'
-    assert test_blob['event'] == 'CREATE'
     assert not test_blob.get(EVENT_TOO_BIG_FLAG)
-    assert json.dumps(test_blob['new_image'], sort_keys=True) == \
+    assert json.dumps(test_blob['item'], sort_keys=True) == \
         json.dumps(dict(_get_durable_pynamo_obj(data['dynamodb']['NewImage'], DurableS3Model)), sort_keys=True)
-    assert test_blob['old_image'] == {}
 
     # Unmock:
     historical.common.proxy.HISTORICAL_TECHNOLOGY = old_tech
@@ -497,6 +512,24 @@ def test_proxy_lambda(historical_role, historical_sqs, mock_lambda_environment):
     records = deserialize_records(messages)
     assert records[0]['dynamodb']['Keys']['arn']['S'] == new_bucket['arn']
     sqs.delete_message(QueueUrl='proxyqueue', ReceiptHandle=messages[0]['ReceiptHandle'])
+
+    # Nothing should be sent out if this was a DDB global table change event:
+    ddb_change = json.loads(json.dumps(new_bucket))
+    ddb_change['aws:rep:deleting'] = 'something'
+    ddb_change['aws:rep:updatetime'] = new_bucket['eventTime']
+    ddb_change['aws:rep:updateregion'] = 'us-east-1'
+    ddb_change_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=ddb_change,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='MODIFY')
+    ddb_change_item = DynamoDBRecordsFactory(records=[ddb_change_record])
+    ddb_change_data = json.loads(json.dumps(ddb_change_item, default=serialize))
+    handler(ddb_change_data, mock_lambda_environment)
+    assert not sqs.receive_message(QueueUrl='proxyqueue', MaxNumberOfMessages=10).get('Messages')
 
     # Nothing should be sent out if the region is different:
     import historical.common.proxy

@@ -43,9 +43,9 @@ def default_diff(latest_config, current_config):
 def remove_global_dynamo_specific_fields(obj):
     """Remove all fields that are placed in by DynamoDB for global tables"""
     # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables_HowItWorks.html
-    obj.pop("aws:rep:deleting", None)
-    obj.pop("aws:rep:updatetime", None)
-    obj.pop("aws:rep:updateregion", None)
+    obj.pop('aws:rep:deleting', None)
+    obj.pop('aws:rep:updatetime', None)
+    obj.pop('aws:rep:updateregion', None)
 
     return obj
 
