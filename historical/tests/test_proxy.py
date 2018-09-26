@@ -54,7 +54,7 @@ S3_BUCKET = {
         "LifecycleRules": [
             {
                 "Status": "Enabled",
-                "Prefix": None,
+                "Prefix": '',
                 "Expiration": {
                     "Days": 7
                 },

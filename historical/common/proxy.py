@@ -213,4 +213,4 @@ def make_proper_simple_record(record, force_shrink=False):
 
         blob = json.dumps(item)
 
-    return blob
+    return blob.replace('<empty>', '')
