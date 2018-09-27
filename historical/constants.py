@@ -35,4 +35,4 @@ PROXY_REGIONS = os.environ.get('PROXY_REGIONS', 'us-east-1').split(",")
 REGION_ATTR = os.environ.get('REGION_ATTR', 'Region')
 SIMPLE_DURABLE_PROXY = os.environ.get('SIMPLE_DURABLE_PROXY', False)
 LOGGING_LEVEL = extract_log_level_from_environment('LOGGING_LEVEL', logging.INFO)
-EVENT_TOO_BIG_FLAG = "event_too_big"
+EVENT_TOO_BIG_FLAG = 'event_too_big'

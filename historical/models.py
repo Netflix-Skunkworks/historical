@@ -117,3 +117,33 @@ class HistoricalPollerTaskEventModel(Schema):
             payload['next_token'] = next_token
 
         return self.dumps(payload).data
+
+
+class SimpleDurableSchema(Schema):
+    arn = fields.Str(required=True)
+    event_time = fields.Str(required=True, default=default_event_time)
+    tech = fields.Str(required=True)
+    event_too_big = fields.Boolean(required=False)
+    item = fields.Dict(required=False)
+
+    def serialize_me(self, arn, event_time, tech, item=None):
+        """Dumps the proper JSON for the schema. If the event is too big, then don't include the item.
+        :param arn:
+        :param event_time:
+        :param tech:
+        :param item:
+        :return:
+        """
+        payload = {
+            'arn': arn,
+            'event_time': event_time,
+            'tech': tech
+        }
+
+        if item:
+            payload['item'] = item
+
+        else:
+            payload['event_too_big'] = True
+
+        return self.dumps(payload).data.replace('<empty>', '')
