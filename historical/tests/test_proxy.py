@@ -338,6 +338,70 @@ def test_make_proper_simple_record():
     historical.common.proxy.HISTORICAL_TECHNOLOGY = old_tech
 
 
+def test_simple_schema():
+    import historical.common.proxy
+
+    old_tech = historical.common.proxy.HISTORICAL_TECHNOLOGY
+    historical.common.proxy.HISTORICAL_TECHNOLOGY = 's3'
+
+    from historical.common.proxy import make_proper_simple_record
+    from historical.models import SimpleDurableSchema
+
+    # Small object
+    new_bucket = S3_BUCKET.copy()
+    new_bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
+    del new_bucket['eventSource']
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+
+    test_blob = make_proper_simple_record(data)
+
+    # Test loading from the schema:
+    sds = SimpleDurableSchema(strict=True)
+
+    result = sds.loads(test_blob).data
+    test_blob = json.loads(test_blob)
+
+    assert json.dumps(result, sort_keys=True) == json.dumps(test_blob, sort_keys=True)
+    assert json.dumps(json.loads(sds.dumps(result).data), sort_keys=True) == json.dumps(test_blob, sort_keys=True)
+    serialized = sds.serialize_me(test_blob['arn'], test_blob['event_time'], test_blob['tech'], item=test_blob['item'])
+    assert json.dumps(json.loads(serialized), sort_keys=True) == json.dumps(result, sort_keys=True)
+
+    # Big object:
+    new_bucket['configuration'] = new_bucket['configuration'].copy()
+    new_bucket['configuration']['VeryLargeConfigItem'] = 'a' * 262144
+    ddb_record = DynamoDBRecordFactory(
+        dynamodb=DynamoDBDataFactory(
+            NewImage=new_bucket,
+            Keys={
+                'arn': new_bucket['arn']
+            },
+            OldImage=new_bucket),
+        eventName='INSERT')
+    new_item = DynamoDBRecordsFactory(records=[ddb_record])
+    data = json.loads(json.dumps(new_item, default=serialize))['Records'][0]
+    assert math.ceil(sys.getsizeof(json.dumps(data)) / 1024) >= 200
+
+    test_blob = make_proper_simple_record(data)
+    result = sds.loads(test_blob).data
+    test_blob = json.loads(test_blob)
+    assert json.dumps(result, sort_keys=True) == json.dumps(test_blob, sort_keys=True)
+    assert json.dumps(json.loads(sds.dumps(result).data), sort_keys=True) == json.dumps(test_blob, sort_keys=True)
+    serialized = sds.serialize_me(test_blob['arn'], test_blob['event_time'], test_blob['tech'])
+    assert json.dumps(json.loads(serialized), sort_keys=True) == json.dumps(result, sort_keys=True)
+
+    # Unmock:
+    historical.common.proxy.HISTORICAL_TECHNOLOGY = old_tech
+
+
 def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment,
                                buckets):
     """This mostly checks that the differ is able to properly load the reduced dataset from the Proxy."""
