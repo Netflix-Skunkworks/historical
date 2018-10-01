@@ -35,9 +35,11 @@ install_requires = [
 
 tests_require = [
     'pytest==3.1.3',
+    'pytest-cov>=2.5.1',
     'moto>=1.3.2',
     'coveralls==1.1',
-    'factory-boy==2.9.2'
+    'factory-boy==2.9.2',
+    'tox==3.4.0'
 ]
 
 
