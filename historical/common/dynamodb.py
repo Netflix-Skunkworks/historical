@@ -15,9 +15,9 @@ from boto3.dynamodb.types import TypeDeserializer
 from historical.common.exceptions import DurableItemIsMissingException
 from historical.constants import EVENT_TOO_BIG_FLAG
 
-deser = TypeDeserializer()
+DESER = TypeDeserializer()
 
-log = logging.getLogger('historical')
+LOG = logging.getLogger('historical')
 
 '''
 Important compatibility note:
@@ -25,7 +25,7 @@ Important compatibility note:
 - You can serialize and save a Durable object from a Current object if you run `remove_current_specific_fields`
 - You can serialize, but NOT save a Current object from a Durable object if you run `remove_durable_specific_fields`
     ^^ This is by design. There should be no use case for saving a current item based on a durable configuration.
-    
+
 Thus, a Durable object is a subset of a Current object.
 '''
 
@@ -83,32 +83,32 @@ def modify_record(durable_model, current_revision, arn, event_time, diff_func):
     if items:
         latest_revision = items[0]
 
-        latest_config = latest_revision._get_json()[1]['attributes']
-        current_config = current_revision._get_json()[1]['attributes']
+        latest_config = latest_revision._get_json()[1]['attributes']    # pylint: disable=W0212
+        current_config = current_revision._get_json()[1]['attributes']  # pylint: disable=W0212
 
         # Determine if there is truly a difference, disregarding Ephemeral Paths
         diff = diff_func(latest_config, current_config)
         if diff:
-            log.debug(
-                '[~] Difference found saving new revision to durable table. Arn: {} LatestConfig: {} '
-                'CurrentConfig: {}'.format(arn, json.dumps(latest_config), json.dumps(current_config)))
+            LOG.debug(
+                f'[~] Difference found saving new revision to durable table. Arn: {arn} LatestConfig: {latest_config} '
+                f'CurrentConfig: {json.dumps(current_config)}')
             current_revision.save()
     else:
         current_revision.save()
-        log.info('[?] Got modify event but no current revision found. Arn: {arn}'.format(arn=arn))
+        LOG.info(f'[?] Got modify event but no current revision found. Arn: {arn}')
 
 
 def delete_differ_record(old_image, durable_model):
     """Handles a DynamoDB DELETE event type -- For the Differ."""
     data = {}
     for item in old_image:
-        data[item] = deser.deserialize(old_image[item])
+        data[item] = DESER.deserialize(old_image[item])
 
     data['configuration'] = {}
     # we give our own timestamps for TTL deletions
     del data['eventTime']
     durable_model(**data).save()
-    log.debug('[+] Adding deletion marker.')
+    LOG.debug('[+] Adding deletion marker.')
 
 
 def get_full_current_object(arn, current_model):
@@ -119,7 +119,7 @@ def get_full_current_object(arn, current_model):
     :param current_model:
     :return:
     """
-    log.debug('[-->] Item with ARN: {} was too big for SNS -- fetching it from the Current table...'.format(arn))
+    LOG.debug(f'[-->] Item with ARN: {arn} was too big for SNS -- fetching it from the Current table...')
     item = list(current_model.query(arn))
 
     # If for whatever reason, the item *cannot* be found, then this record should be skipped over.
@@ -141,13 +141,13 @@ def get_full_durable_object(arn, event_time, durable_model):
     :param durable_model:
     :return:
     """
-    log.debug('[-->] Item with ARN: {} was too big for SNS -- fetching it from the Durable table...'.format(arn))
+    LOG.debug(f'[-->] Item with ARN: {arn} was too big for SNS -- fetching it from the Durable table...')
     item = list(durable_model.query(arn, durable_model.eventTime == event_time))
 
     # It is not clear if this would ever be the case... We will consider this an error condition for now.
     if not item:
-        log.error('[?] Item with ARN/Event Time: {}/{} was NOT found in the Durable table... This is odd.'.format(
-            arn, event_time))
+        LOG.error(f'[?] Item with ARN/Event Time: {arn}/{event_time} was NOT found in the Durable table...'
+                  f' This is odd.')
         raise DurableItemIsMissingException({"item_arn": arn, "event_time": event_time})
 
     # We need to place the real configuration data into the record so it can be deserialized into
@@ -172,7 +172,7 @@ def deserialize_current_record_to_durable_model(record, current_model, durable_m
         if not record:
             return None
 
-        serialized = record._serialize()
+        serialized = record._serialize()  # pylint: disable=W0212
 
         record = {
             'dynamodb': {
@@ -188,7 +188,7 @@ def deserialize_current_record_to_durable_model(record, current_model, durable_m
 
     for item, value in new_image.items():
         # This could end up as loss of precision
-        data[item] = deser.deserialize(value)
+        data[item] = DESER.deserialize(value)
 
     return durable_model(**data)
 
@@ -211,7 +211,7 @@ def deserialize_current_record_to_current_model(record, current_model):
 
     for item, value in new_image.items():
         # This could end up as loss of precision
-        data[item] = deser.deserialize(value)
+        data[item] = DESER.deserialize(value)
 
     return current_model(**data)
 
@@ -236,7 +236,7 @@ def deserialize_durable_record_to_durable_model(record, durable_model):
 
     for item, value in new_image.items():
         # This could end up as loss of precision
-        data[item] = deser.deserialize(value)
+        data[item] = DESER.deserialize(value)
 
     return durable_model(**data)
 
@@ -260,7 +260,7 @@ def deserialize_durable_record_to_current_model(record, current_model):
 
     for item, value in new_image.items():
         # This could end up as loss of precision
-        data[item] = deser.deserialize(value)
+        data[item] = DESER.deserialize(value)
 
     return current_model(**data)
 
@@ -287,7 +287,7 @@ def process_dynamodb_differ_record(record, current_model, durable_model, diff_fu
         if record.get('userIdentity'):
             if record['userIdentity']['type'] == 'Service':
                 if record['userIdentity']['principalId'] == 'dynamodb.amazonaws.com':
-                    log.error('[TTL] We received a TTL delete. Old Image: {}'.format(record['dynamodb']['OldImage']))
+                    LOG.error(f"[TTL] We received a TTL delete. Old Image: {record['dynamodb']['OldImage']}")
                     old_image = remove_current_specific_fields(record['dynamodb']['OldImage'])
                     delete_differ_record(old_image, durable_model)
 
@@ -296,13 +296,12 @@ def process_dynamodb_differ_record(record, current_model, durable_model, diff_fu
         current_revision = deserialize_current_record_to_durable_model(record, current_model, durable_model)
 
         if not current_revision:
-            log.error("[?] Received item too big for SNS, and was not able to find the original item with ARN: {}"
-                      .format(arn))
+            LOG.error(f'[?] Received item too big for SNS, and was not able to find the original item with ARN: {arn}')
             return
 
         if record['eventName'] == 'INSERT':
             current_revision.save()
-            log.debug('[+] Saving new revision to durable table.')
+            LOG.debug('[+] Saving new revision to durable table.')
 
         elif record['eventName'] == 'MODIFY':
             modify_record(durable_model, current_revision, arn, current_revision.eventTime, diff_func)

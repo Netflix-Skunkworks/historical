@@ -14,16 +14,8 @@ import boto3
 
 from historical.common.sqs import get_queue_url
 from historical.models import HistoricalPollerTaskEventModel
-from historical.tests.factories import (
-    CloudwatchEventFactory,
-    DetailFactory,
-    RecordsFactory,
-    DynamoDBDataFactory,
-    DynamoDBRecordFactory,
-    SQSDataFactory,
-    UserIdentityFactory,
-    serialize,
-    SnsDataFactory)
+from historical.tests.factories import CloudwatchEventFactory, DetailFactory, DynamoDBDataFactory, \
+    DynamoDBRecordFactory, RecordsFactory, serialize, SnsDataFactory, SQSDataFactory, UserIdentityFactory
 from historical.vpc.models import VERSION
 
 VPC = {
@@ -69,7 +61,9 @@ VPC = {
 }
 
 
+# pylint: disable=W0613
 def test_current_table(current_vpc_table):
+    """Tests for the Current PynamoDB model."""
     from historical.vpc.models import CurrentVPCModel
 
     CurrentVPCModel(**VPC).save()
@@ -81,22 +75,24 @@ def test_current_table(current_vpc_table):
     assert items[0].ttl > 0
 
 
+# pylint: disable=W0613
 def test_durable_table(durable_vpc_table):
+    """Tests for the Durable PynamoDB model."""
     from historical.vpc.models import DurableVPCModel
 
     # we are explicit about our eventTimes because as RANGE_KEY it will need to be unique.
-    v = VPC.copy()
-    v.pop("eventSource")
-    v['eventTime'] = datetime(2017, 5, 11, 23, 30)
-    DurableVPCModel(**v).save()
+    vpc = VPC.copy()
+    vpc.pop("eventSource")
+    vpc['eventTime'] = datetime(2017, 5, 11, 23, 30)
+    DurableVPCModel(**vpc).save()
 
     items = list(DurableVPCModel.query('arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343'))
 
     assert len(items) == 1
     assert not getattr(items[0], 'ttl', None)
 
-    v['eventTime'] = datetime(2017, 5, 12, 23, 30)
-    DurableVPCModel(**v).save()
+    vpc['eventTime'] = datetime(2017, 5, 12, 23, 30)
+    DurableVPCModel(**vpc).save()
 
     items = list(DurableVPCModel.query('arn:aws:ec2:us-east-1:123456789012:vpc/vpc-123343'))
 
@@ -114,13 +110,15 @@ def make_poller_events():
     messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
 
     # 'Body' needs to be made into 'body' for proper parsing later:
-    for m in messages:
-        m['body'] = m.pop('Body')
+    for msg in messages:
+        msg['body'] = msg.pop('Body')
 
     return messages
 
 
+# pylint: disable=W0613
 def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_accounts):
+    """Test the Poller tasker."""
     from historical.common.accounts import get_historical_accounts
     from historical.constants import CURRENT_REGION
 
@@ -134,6 +132,7 @@ def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_acc
 
 
 def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_environment, vpcs, swag_accounts):
+    """Test the Poller's processing component that tasks the collector."""
     from historical.vpc.poller import poller_processor_handler as handler
 
     # Create the events and SQS records:
@@ -151,7 +150,9 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
     assert len(messages) == 2
 
 
+# pylint: disable=R0915
 def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
+    """Tests the Differ."""
     from historical.vpc.models import DurableVPCModel
     from historical.vpc.differ import handler
     from historical.models import TTL_EXPIRY
@@ -161,12 +162,11 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     new_vpc.pop("eventSource")
     new_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
     new_vpc['ttl'] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=new_vpc,
-        Keys={
-            'arn': new_vpc['arn']
-        }
-    ), eventName='INSERT'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=new_vpc, Keys={'arn': new_vpc['arn']}),
+            eventName='INSERT'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -177,12 +177,11 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     duplicate_vpc.pop("eventSource")
     duplicate_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     duplicate_vpc['ttl'] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=duplicate_vpc,
-        Keys={
-            'arn': duplicate_vpc['arn']
-        }
-    ), eventName='MODIFY'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=duplicate_vpc, Keys={'arn': duplicate_vpc['arn']}),
+            eventName='MODIFY'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -193,12 +192,11 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['State'] = 'changeme'
     updated_vpc['ttl'] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=updated_vpc,
-        Keys={
-            'arn': VPC['arn']
-        }
-    ), eventName='MODIFY'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=updated_vpc, Keys={'arn': VPC['arn']}),
+            eventName='MODIFY'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -209,12 +207,11 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_vpc['configuration']['CidrBlock'] = 'changeme'
     updated_vpc['ttl'] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=updated_vpc,
-        Keys={
-            'arn': VPC['arn']
-        }
-    ), eventName='MODIFY'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=updated_vpc, Keys={'arn': VPC['arn']}),
+            eventName='MODIFY'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -225,12 +222,11 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     updated_vpc['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=31, second=0).isoformat() + 'Z'
     updated_vpc.update({'Name': 'blah'})
     updated_vpc['ttl'] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=updated_vpc,
-        Keys={
-            'arn': VPC['arn']
-        }
-    ), eventName='MODIFY'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=updated_vpc, Keys={'arn': VPC['arn']}),
+            eventName='MODIFY'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -242,17 +238,12 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
     deleted_vpc['ttl'] = ttl
 
     # ensure new record
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        OldImage=deleted_vpc,
-        Keys={
-            'arn': VPC['arn']
-        }
-    ),
-        eventName='REMOVE',
-        userIdentity=UserIdentityFactory(
-            type='Service',
-            principalId='dynamodb.amazonaws.com'
-        )), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(
+                OldImage=deleted_vpc, Keys={'arn': VPC['arn']}), eventName='REMOVE', userIdentity=UserIdentityFactory(
+                    type='Service', principalId='dynamodb.amazonaws.com')),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -260,6 +251,7 @@ def test_differ(current_vpc_table, durable_vpc_table, mock_lambda_environment):
 
 
 def test_collector(historical_role, mock_lambda_environment, vpcs, current_vpc_table):
+    """Test the Collector."""
     from historical.vpc.models import CurrentVPCModel
     from historical.vpc.collector import handler
     event = CloudwatchEventFactory(

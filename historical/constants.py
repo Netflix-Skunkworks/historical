@@ -9,7 +9,7 @@
 import logging
 import os
 
-log_levels = {
+LOG_LEVELS = {
     'CRITICAL': logging.CRITICAL,
     'ERROR': logging.ERROR,
     'WARNING': logging.WARNING,
@@ -19,7 +19,8 @@ log_levels = {
 
 
 def extract_log_level_from_environment(k, default):
-    return log_levels.get(os.environ.get(k)) or int(os.environ.get(k, default))
+    """Gets the log level from the environment variable."""
+    return LOG_LEVELS.get(os.environ.get(k)) or int(os.environ.get(k, default))
 
 
 # 24 hours in seconds is the default

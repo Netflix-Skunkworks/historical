@@ -13,14 +13,14 @@ import time
 from datetime import datetime
 
 import boto3
-import pytest
-from mock import MagicMock
+import pytest  # pylint: disable=E0401
+from mock import MagicMock  # pylint: disable=E0401
 
 from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.models import TTL_EXPIRY
-from historical.s3.models import VERSION, DurableS3Model
-from historical.tests.factories import DynamoDBRecordFactory, DynamoDBDataFactory, DynamoDBRecordsFactory, serialize, \
-    CloudwatchEventFactory, DetailFactory, RecordsFactory, SQSDataFactory, SnsDataFactory
+from historical.s3.models import VERSION
+from historical.tests.factories import CloudwatchEventFactory, DetailFactory, DynamoDBDataFactory, \
+    DynamoDBRecordFactory, DynamoDBRecordsFactory, RecordsFactory, serialize, SnsDataFactory, SQSDataFactory
 
 S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
@@ -77,6 +77,7 @@ S3_BUCKET = {
 
 
 def test_make_blob():
+    """Tests that the shrinking SNS/SQS shrinking code works properly."""
     from historical.common.proxy import shrink_blob
 
     ttl = int(time.time() + TTL_EXPIRY)
@@ -106,6 +107,7 @@ def test_make_blob():
 
 
 def test_detect_global_table_updates():
+    """Tests that Global DDB updates don't get proxied over."""
     from historical.common.dynamodb import remove_global_dynamo_specific_fields
     from historical.common.proxy import detect_global_table_updates
 
@@ -160,14 +162,16 @@ def test_detect_global_table_updates():
     assert not detect_global_table_updates(data)
 
 
+# pylint: disable=W0212
 def test_make_proper_dynamodb_record():
+    """Tests that the Proxy can generate the proper DDB stream events."""
     import historical.common.proxy
 
     old_publish_message = historical.common.proxy._publish_sns_message
-    old_logger = historical.common.proxy.log
+    old_logger = historical.common.proxy.LOG
 
     mock_logger = MagicMock()
-    historical.common.proxy.log = mock_logger
+    historical.common.proxy.LOG = mock_logger
 
     from historical.common.proxy import make_proper_dynamodb_record
 
@@ -233,16 +237,19 @@ def test_make_proper_dynamodb_record():
 
     # Unmock:
     historical.common.proxy._publish_sns_message = old_publish_message
-    historical.common.proxy.log = old_logger
+    historical.common.proxy.LOG = old_logger
 
 
+# pylint: disable=R0915
 def test_make_proper_simple_record():
+    """Tests that the simple durable schema can be generated properly for all event types."""
     import historical.common.proxy
 
     old_tech = historical.common.proxy.HISTORICAL_TECHNOLOGY
     historical.common.proxy.HISTORICAL_TECHNOLOGY = 's3'
 
     from historical.common.proxy import make_proper_simple_record, _get_durable_pynamo_obj
+    from historical.s3.models import DurableS3Model
 
     # With a small item:
     new_bucket = S3_BUCKET.copy()
@@ -339,6 +346,7 @@ def test_make_proper_simple_record():
 
 
 def test_simple_schema():
+    """Tests that the simple durable schema itself."""
     import historical.common.proxy
 
     old_tech = historical.common.proxy.HISTORICAL_TECHNOLOGY
@@ -402,6 +410,7 @@ def test_simple_schema():
     historical.common.proxy.HISTORICAL_TECHNOLOGY = old_tech
 
 
+# pylint: disable=R0914,R0915,W0613
 def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_table, mock_lambda_environment,
                                buckets):
     """This mostly checks that the differ is able to properly load the reduced dataset from the Proxy."""
@@ -413,9 +422,9 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
 
     # Mock out the loggers:
     import historical.common.dynamodb
-    old_logger = historical.common.dynamodb.log
+    old_logger = historical.common.dynamodb.LOG
     mocked_logger = MagicMock()
-    historical.common.dynamodb.log = mocked_logger
+    historical.common.dynamodb.LOG = mocked_logger
 
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
     create_event = CloudwatchEventFactory(
@@ -497,8 +506,8 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
         '[+] Saving new revision to durable table.',
         '[-->] Item with ARN: arn:aws:s3:::testbucket1 was too big for SNS -- fetching it from the Current table...'
     ]
-    for dc in debug_calls:
-        mocked_logger.debug.assert_any_call(dc)
+    for dcall in debug_calls:
+        mocked_logger.debug.assert_any_call(dcall)
 
     mocked_logger.error.assert_called_once_with('[?] Received item too big for SNS, and was not able to '
                                                 'find the original item with ARN: arn:aws:s3:::notinthecurrenttable')
@@ -533,11 +542,12 @@ def test_proxy_dynamodb_differ(historical_role, current_s3_table, durable_s3_tab
     assert not result[1].configuration.attribute_values
 
     # Unmock the logger:
-    historical.common.dynamodb.log = old_logger
+    historical.common.dynamodb.LOG = old_logger
 
 
+# pylint: disable=R0914,W0613
 def test_proxy_lambda(historical_role, historical_sqs, mock_lambda_environment):
-    import historical.common.proxy
+    """Tests the proxy Lambda function from start to finish."""
     from historical.constants import CURRENT_REGION
     from historical.common.exceptions import MissingProxyConfigurationException
     from historical.common.proxy import handler

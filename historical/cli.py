@@ -1,17 +1,25 @@
+"""
+.. module: historical.cli
+    :platform: Unix
+    :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
+    :license: Apache, see LICENSE for more details.
+.. author:: Mike Grima <mgrima@netflix.com>
+"""
 import os
 import logging
+
 import click
 import click_log
-from cookiecutter.main import cookiecutter
+from cookiecutter.main import cookiecutter  # pylint: disable=E0401
 
 from historical.__about__ import __version__
 
-log = logging.getLogger('historical')
-click_log.basic_config(log)
+LOG = logging.getLogger('historical')
+click_log.basic_config(LOG)
 
 
 @click.group()
-@click_log.simple_verbosity_option(log)
+@click_log.simple_verbosity_option(LOG)
 @click.version_option(version=__version__)
 def cli():
     """Historical commandline for managing historical functions."""

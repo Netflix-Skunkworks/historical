@@ -9,57 +9,48 @@
 import json
 import decimal
 
-from pynamodb.attributes import (
-    Attribute,
-    MapAttribute,
-    ListAttribute,
-    BooleanAttribute,
-    NumberAttribute,
-)
+from pynamodb.attributes import Attribute, BooleanAttribute, ListAttribute, MapAttribute, NumberAttribute
 
 import pynamodb
-from pynamodb.constants import STRING, NUMBER
+from pynamodb.constants import NUMBER, STRING
 
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
 
 class HistoricalUnicodeAttribute(Attribute):
-    """
-    A Historical unicode attribute.
+    """A Historical unicode attribute.
     Replaces '' with '<empty>' during serialization and correctly deserialize '<empty>' to ''
     """
+
     attr_type = STRING
 
     def serialize(self, value):
-        """
-        Returns a unicode string
-        """
-        if value is None or not len(value):
+        """Returns a unicode string"""
+        if value is None or not len(value):  # pylint: disable=C1801
             return '<empty>'
         return value
 
     def deserialize(self, value):
+        """Strips out the `<empty>` placeholders with empty strings."""
         if value == '<empty>':
             return ''
         return value
 
 
 class EventTimeAttribute(Attribute):
-    """
-    An attribute for storing a UTC Datetime or iso8601 string
-    """
+    """An attribute for storing a UTC Datetime or iso8601 string."""
+
     attr_type = STRING
 
     def serialize(self, value):
-        """
-        Takes a datetime object and returns a string
-        """
+        """Takes a datetime object and returns a string"""
         if isinstance(value, str):
             return value
         return value.strftime(DATETIME_FORMAT)
 
 
 def decimal_default(obj):
+    """Properly parse out the Decimal datatypes into proper int/float types."""
     if isinstance(obj, decimal.Decimal):
         if obj % 1:
             return float(obj)
@@ -67,9 +58,11 @@ def decimal_default(obj):
     raise TypeError
 
 
+# pylint: disable=R1705,C0200
 def fix_decimals(obj):
     """Removes the stupid Decimals
-       See: https://github.com/boto/boto3/issues/369#issuecomment-302137290
+
+    See: https://github.com/boto/boto3/issues/369#issuecomment-302137290
     """
     if isinstance(obj, list):
         for i in range(len(obj)):
@@ -92,21 +85,16 @@ def fix_decimals(obj):
 
 
 class HistoricalDecimalAttribute(Attribute):
-    """
-    A number attribute
-    """
+    """A number attribute"""
+
     attr_type = NUMBER
 
     def serialize(self, value):
-        """
-        Encode numbers as JSON
-        """
+        """Encode numbers as JSON"""
         return json.dumps(value, default=decimal_default)
 
     def deserialize(self, value):
-        """
-        Decode numbers from JSON
-        """
+        """Decode numbers from JSON"""
         return json.loads(value)
 
 

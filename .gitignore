@@ -173,7 +173,7 @@ venv
 *.test.yml
 serverless.yml
 serverless_configs/*
-
+test-reports/*
 
 ### VisualStudioCode ###
 .vscode

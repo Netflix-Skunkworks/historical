@@ -8,8 +8,12 @@
 
 
 class DurableItemIsMissingException(Exception):
+    """Exception for if a Durable Item is missing but should be found."""
+
     pass
 
 
 class MissingProxyConfigurationException(Exception):
+    """Exception if the Proxy is missing the proper configuration on how to operate."""
+
     pass

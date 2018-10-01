@@ -16,6 +16,7 @@ from historical.tests.factories import (
 
 
 def test_filter_request_parameters():
+    """Tests that specific elements can be pulled out of the Request Parameters in the CloudWatch Event."""
     from historical.common.cloudwatch import filter_request_parameters
     event = CloudwatchEventFactory(
         detail=DetailFactory(
@@ -27,6 +28,7 @@ def test_filter_request_parameters():
 
 
 def test_get_user_identity():
+    """Tests that the User Identity can be pulled out of the CloudWatch Event."""
     from historical.common.cloudwatch import get_user_identity
     event = CloudwatchEventFactory()
     data = json.loads(json.dumps(event, default=serialize))
@@ -34,6 +36,7 @@ def test_get_user_identity():
 
 
 def test_get_principal():
+    """Tests that the Principal object can be pulled out of the CloudWatch Event."""
     from historical.common.cloudwatch import get_principal
     event = CloudwatchEventFactory()
     data = json.loads(json.dumps(event, default=serialize))
@@ -41,6 +44,7 @@ def test_get_principal():
 
 
 def test_get_region():
+    """Tests that the Region can be pulled out of the CloudWatch Event."""
     from historical.common.cloudwatch import get_region
     event = CloudwatchEventFactory()
     data = json.loads(json.dumps(event, default=serialize))
@@ -48,6 +52,7 @@ def test_get_region():
 
 
 def test_get_event_time():
+    """Tests that the Event Time can be pulled out of the CloudWatch Event."""
     from historical.common.cloudwatch import get_event_time
     event = CloudwatchEventFactory()
     data = json.loads(json.dumps(event, default=serialize))
@@ -55,8 +60,8 @@ def test_get_event_time():
 
 
 def test_get_account_id():
+    """Tests that the Account ID can be pulled out of the CloudWatch Event."""
     from historical.common.cloudwatch import get_account_id
     event = CloudwatchEventFactory()
     data = json.loads(json.dumps(event, default=serialize))
     assert get_account_id(data) == '123456789012'
-
