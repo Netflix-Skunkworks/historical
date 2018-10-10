@@ -15,8 +15,8 @@ def deserialize_records(records):
         - SNS
     """
     native_records = []
-    for r in records:
-        parsed = json.loads(r['body'])
+    for record in records:
+        parsed = json.loads(record['body'])
 
         # Is this a DynamoDB stream event?
         if isinstance(parsed, str):
@@ -46,8 +46,8 @@ def pull_tag_dict(data):
     tags = data.pop('Tags', {}) or {}
     if tags:
         proper_tags = {}
-        for t in tags:
-            proper_tags[t['Key']] = t['Value']
+        for tag in tags:
+            proper_tags[tag['Key']] = tag['Value']
 
         tags = proper_tags
 

@@ -1,9 +1,10 @@
 """
 .. module: historical.security_group.poller
     :platform: Unix
-    :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
+    :copyright: (c) 2018 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
+.. author:: Mike Grima <mgrima@netflix.com>
 """
 import os
 import logging
@@ -15,18 +16,18 @@ from cloudaux.aws.ec2 import describe_security_groups
 
 from historical.common.sqs import get_queue_url, produce_events
 from historical.common.util import deserialize_records
-from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL, RANDOMIZE_POLLER
+from historical.constants import HISTORICAL_ROLE, LOGGING_LEVEL, POLL_REGIONS, RANDOMIZE_POLLER
 from historical.models import HistoricalPollerTaskEventModel
-from historical.security_group.models import security_group_polling_schema
+from historical.security_group.models import SECURITY_GROUP_POLLING_SCHEMA
 from historical.common.accounts import get_historical_accounts
 
 logging.basicConfig()
-log = logging.getLogger("historical")
-log.setLevel(LOGGING_LEVEL)
+LOG = logging.getLogger("historical")
+LOG.setLevel(LOGGING_LEVEL)
 
 
 @RavenLambdaWrapper()
-def poller_tasker_handler(event, context):
+def poller_tasker_handler(event, context):  # pylint: disable=W0613
     """
     Historical Security Group Poller Tasker.
 
@@ -38,7 +39,7 @@ def poller_tasker_handler(event, context):
     This is the entry point. This will task subsequent Poller lambdas to list all of a given resource in a select few
     AWS accounts.
     """
-    log.debug('[@] Running Poller Tasker...')
+    LOG.debug('[@] Running Poller Tasker...')
 
     queue_url = get_queue_url(os.environ.get('POLLER_TASKER_QUEUE_NAME', 'HistoricalSecurityGroupPollerTasker'))
     poller_task_schema = HistoricalPollerTaskEventModel()
@@ -50,14 +51,14 @@ def poller_tasker_handler(event, context):
 
     try:
         produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
-    except ClientError as e:
-        log.error('[X] Unable to generate poller tasker events! Reason: {reason}'.format(reason=e))
+    except ClientError as exc:
+        LOG.error(f'[X] Unable to generate poller tasker events! Reason: {exc}')
 
-    log.debug('[@] Finished tasking the pollers.')
+    LOG.debug('[@] Finished tasking the pollers.')
 
 
 @RavenLambdaWrapper()
-def poller_processor_handler(event, context):
+def poller_processor_handler(event, context):  # pylint: disable=W0613
     """
     Historical Security Group Poller Processor.
 
@@ -65,7 +66,7 @@ def poller_processor_handler(event, context):
     account/region pair. This will generate `polling events` which simulate changes. These polling events contain
     configuration data such as the account/region defining where the collector should attempt to gather data from.
     """
-    log.debug('[@] Running Poller...')
+    LOG.debug('[@] Running Poller...')
 
     collector_poller_queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalSecurityGroupPoller'))
     takser_queue_url = get_queue_url(os.environ.get('POLLER_TASKER_QUEUE_NAME', 'HistoricalSecurityGroupPollerTasker'))
@@ -78,7 +79,7 @@ def poller_processor_handler(event, context):
         try:
             # Did we get a NextToken?
             if record.get('NextToken'):
-                log.debug(f"[@] Received pagination token: {record['NextToken']}")
+                LOG.debug(f"[@] Received pagination token: {record['NextToken']}")
                 groups = describe_security_groups(
                     account_number=record['account_id'],
                     assume_role=HISTORICAL_ROLE,
@@ -106,12 +107,12 @@ def poller_processor_handler(event, context):
 
             # Task the collector to perform all the DDB logic -- this will pass in the collected data to the
             # collector in very small batches.
-            events = [security_group_polling_schema.serialize(record['account_id'], g, record['region'])
+            events = [SECURITY_GROUP_POLLING_SCHEMA.serialize(record['account_id'], g, record['region'])
                       for g in groups['SecurityGroups']]
             produce_events(events, collector_poller_queue_url, batch_size=3)
 
-            log.debug(f"[@] Finished generating polling events. Account: {record['account_id']}/{record['region']} "
+            LOG.debug(f"[@] Finished generating polling events. Account: {record['account_id']}/{record['region']} "
                       f"Events Created: {len(events)}")
-        except ClientError as e:
-            log.error(f"[X] Unable to generate events for account/region. Account Id/Region: {record['account_id']}"
-                      f"/{record['region']} Reason: {e}")
+        except ClientError as exc:
+            LOG.error(f"[X] Unable to generate events for account/region. Account Id/Region: {record['account_id']}"
+                      f"/{record['region']} Reason: {exc}")

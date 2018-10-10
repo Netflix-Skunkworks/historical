@@ -14,8 +14,8 @@ import boto3
 from historical.constants import CURRENT_REGION
 
 logging.basicConfig()
-log = logging.getLogger('historical')
-log.setLevel(logging.INFO)
+LOG = logging.getLogger('historical')
+LOG.setLevel(logging.INFO)
 
 
 def chunks(event_list, chunk_size):
@@ -41,14 +41,15 @@ def make_sqs_record(event, delay_seconds=0):
     }
 
 
-def get_random_delay(max):
+def get_random_delay(max_seconds):
     """Gets a randomized number between 0 and the max number in seconds for
        how long a message in SQS should be delayed.
 
        900 seconds (15 min) is the maximum permitted by SQS.
+    :param max_seconds:
     :return:
     """
-    return random.randint(0, max)
+    return random.randint(0, max_seconds)  # nosec
 
 
 def produce_events(events, queue_url, batch_size=10, randomize_delay=0):
@@ -73,23 +74,28 @@ def produce_events(events, queue_url, batch_size=10, randomize_delay=0):
 
 
 def group_records_by_type(records, update_events):
-    """Break records into two lists; create/update events and delete events."""
+    """Break records into two lists; create/update events and delete events.
+
+    :param records:
+    :param update_events:
+    :return update_records, delete_records:
+    """
     update_records, delete_records = [], []
-    for r in records:
-        if r.get("detail-type", "") == "Scheduled Event":
-            log.error("[X] Received a Scheduled Event in the Queue... Please check that your environment is set up"
+    for record in records:
+        if record.get("detail-type", "") == "Scheduled Event":
+            LOG.error("[X] Received a Scheduled Event in the Queue... Please check that your environment is set up"
                       " correctly.")
             continue
 
         # Ignore SQS junk messages (like subscription notices and things):
-        if not r.get("detail"):
+        if not record.get("detail"):
             continue
 
         # Do not capture error events:
-        if not r["detail"].get("errorCode"):
-            if r['detail']['eventName'] in update_events:
-                update_records.append(r)
+        if not record["detail"].get("errorCode"):
+            if record['detail']['eventName'] in update_events:
+                update_records.append(record)
             else:
-                delete_records.append(r)
+                delete_records.append(record)
 
     return update_records, delete_records

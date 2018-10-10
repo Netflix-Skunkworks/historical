@@ -16,15 +16,14 @@ from retrying import retry
 
 from raven_python_lambda import RavenLambdaWrapper
 
-from historical.common.dynamodb import remove_global_dynamo_specific_fields, deser
+from historical.common.dynamodb import DESER, remove_global_dynamo_specific_fields
 from historical.common.exceptions import MissingProxyConfigurationException
 from historical.common.sqs import produce_events
-from historical.constants import CURRENT_REGION, REGION_ATTR, PROXY_REGIONS, EVENT_TOO_BIG_FLAG,\
-    SIMPLE_DURABLE_PROXY
+from historical.constants import CURRENT_REGION, EVENT_TOO_BIG_FLAG, PROXY_REGIONS, REGION_ATTR, SIMPLE_DURABLE_PROXY
 
 from historical.mapping import DURABLE_MAPPING, HISTORICAL_TECHNOLOGY
 
-log = logging.getLogger('historical')
+LOG = logging.getLogger('historical')
 
 
 @retry(stop_max_attempt_number=4, wait_exponential_multiplier=1000, wait_exponential_max=1000)
@@ -64,7 +63,7 @@ def shrink_blob(record, deletion):
 
 
 @RavenLambdaWrapper()
-def handler(event, context):
+def handler(event, context):  # pylint: disable=W0613
     """Historical S3 DynamoDB Stream Forwarder (the 'Proxy').
 
     Passes events from the Historical DynamoDB stream and passes it to SNS or SQS for additional events to trigger.
@@ -94,8 +93,8 @@ def handler(event, context):
         for img in ['NewImage', 'OldImage']:
             if record['dynamodb'].get(img):
                 if record['dynamodb'][img][REGION_ATTR]['S'] not in PROXY_REGIONS:
-                    log.debug("[/] Not processing record -- record event took place in: {}".format(
-                        record['dynamodb'][img][REGION_ATTR]['S']))
+                    LOG.debug(f"[/] Not processing record -- record event took place in:"
+                              f" {record['dynamodb'][img][REGION_ATTR]['S']}")
                     correct_region = False
                     break
 
@@ -175,7 +174,7 @@ def _get_durable_pynamo_obj(record_data, durable_model):
 
     for item, value in image.items():
         # This could end up as loss of precision
-        data[item] = deser.deserialize(value)
+        data[item] = DESER.deserialize(value)
 
     return durable_model(**data)
 

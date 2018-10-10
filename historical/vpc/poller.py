@@ -14,20 +14,20 @@ from botocore.exceptions import ClientError
 from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_vpcs
 
-from historical.constants import POLL_REGIONS, HISTORICAL_ROLE, LOGGING_LEVEL, RANDOMIZE_POLLER
+from historical.constants import HISTORICAL_ROLE, LOGGING_LEVEL, POLL_REGIONS, RANDOMIZE_POLLER
 from historical.common.util import deserialize_records
-from historical.vpc.models import vpc_polling_schema
+from historical.vpc.models import VPC_POLLING_SCHEMA
 from historical.models import HistoricalPollerTaskEventModel
 from historical.common.accounts import get_historical_accounts
-from historical.common.sqs import produce_events, get_queue_url
+from historical.common.sqs import get_queue_url, produce_events
 
 logging.basicConfig()
-log = logging.getLogger("historical")
-log.setLevel(LOGGING_LEVEL)
+LOG = logging.getLogger("historical")
+LOG.setLevel(LOGGING_LEVEL)
 
 
 @RavenLambdaWrapper()
-def poller_tasker_handler(event, context):
+def poller_tasker_handler(event, context):  # pylint: disable=W0613
     """
     Historical VPC Poller Tasker.
 
@@ -39,7 +39,7 @@ def poller_tasker_handler(event, context):
     This is the entry point. This will task subsequent Poller lambdas to list all of a given resource in a select few
     AWS accounts.
     """
-    log.debug('[@] Running Poller Tasker...')
+    LOG.debug('[@] Running Poller Tasker...')
 
     queue_url = get_queue_url(os.environ.get('POLLER_TASKER_QUEUE_NAME', 'HistoricalVPCPollerTasker'))
     poller_task_schema = HistoricalPollerTaskEventModel()
@@ -51,14 +51,14 @@ def poller_tasker_handler(event, context):
 
     try:
         produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
-    except ClientError as e:
-        log.error('[X] Unable to generate poller tasker events! Reason: {reason}'.format(reason=e))
+    except ClientError as exc:
+        LOG.error(f'[X] Unable to generate poller tasker events! Reason: {exc}')
 
-    log.debug('[@] Finished tasking the pollers.')
+    LOG.debug('[@] Finished tasking the pollers.')
 
 
 @RavenLambdaWrapper()
-def poller_processor_handler(event, context):
+def poller_processor_handler(event, context):  # pylint: disable=W0613
     """
     Historical Security Group Poller Processor.
 
@@ -66,7 +66,7 @@ def poller_processor_handler(event, context):
     account/region pair. This will generate `polling events` which simulate changes. These polling events contain
     configuration data such as the account/region defining where the collector should attempt to gather data from.
     """
-    log.debug('[@] Running Poller...')
+    LOG.debug('[@] Running Poller...')
 
     queue_url = get_queue_url(os.environ.get('POLLER_QUEUE_NAME', 'HistoricalVPCPoller'))
 
@@ -81,10 +81,10 @@ def poller_processor_handler(event, context):
                 region=record['region']
             )
 
-            events = [vpc_polling_schema.serialize(record['account_id'], v) for v in vpcs]
+            events = [VPC_POLLING_SCHEMA.serialize(record['account_id'], v) for v in vpcs]
             produce_events(events, queue_url, randomize_delay=RANDOMIZE_POLLER)
-            log.debug('[@] Finished generating polling events. Account: {}/{} '
-                      'Events Created: {}'.format(record['account_id'], record['region'], len(events)))
-        except ClientError as e:
-            log.error('[X] Unable to generate events for account/region. Account Id/Region: {account_id}/{region}'
-                      ' Reason: {reason}'.format(account_id=record['account_id'], region=record['region'], reason=e))
+            LOG.debug(f"[@] Finished generating polling events. Account: {record['account_id']}/{record['region']} "
+                      f"Events Created: {len(events)}")
+        except ClientError as exc:
+            LOG.error(f"[X] Unable to generate events for account/region. Account Id/Region: {record['account_id']}"
+                      f"/{record['region']} Reason: {exc}")

@@ -6,18 +6,18 @@
 .. author:: Mike Grima <mgrima@netflix.com>
 """
 import logging
-from deepdiff import DeepDiff
 
+from deepdiff import DeepDiff
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.util import deserialize_records
 from historical.constants import LOGGING_LEVEL
-from historical.s3.models import DurableS3Model, CurrentS3Model
+from historical.s3.models import CurrentS3Model, DurableS3Model
 from historical.common.dynamodb import process_dynamodb_differ_record
 
 logging.basicConfig()
-log = logging.getLogger('historical')
-log.setLevel(LOGGING_LEVEL)
+LOG = logging.getLogger('historical')
+LOG.setLevel(LOGGING_LEVEL)
 
 # Path to where in the dict the ephemeral field is -- starting with "root['M'][PathInConfigDontForgetDataType]..."
 EPHEMERAL_PATHS = []
@@ -35,7 +35,7 @@ def is_new_revision(latest_revision, current_revision):
 
 
 @RavenLambdaWrapper()
-def handler(event, context):
+def handler(event, context):  # pylint: disable=W0613
     """
     Historical S3 event differ.
 

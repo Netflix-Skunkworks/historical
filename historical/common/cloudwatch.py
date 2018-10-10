@@ -1,18 +1,14 @@
 """
-Helper functions for processing cloudwatch events.
-
 .. module: historical.common.cloudwatch
     :platform: Unix
     :copyright: (c) 2017 by Netflix Inc., see AUTHORS for more
     :license: Apache, see LICENSE for more details.
 .. author:: Kevin Glisson <kglisson@netflix.com>
+.. author:: Mike Grima <mgrima@netflix.com>
 """
-import logging
 from datetime import datetime
 
 from historical.constants import CURRENT_REGION
-
-logger = logging.getLogger(__name__)
 
 
 def filter_request_parameters(field_name, msg, look_in_response=False):
@@ -31,7 +27,7 @@ def filter_request_parameters(field_name, msg, look_in_response=False):
                 val = msg['detail']['responseElements'].get(field_name, None)
 
     # Just in case... We didn't find the value, so just make it None:
-    except AttributeError as _:
+    except AttributeError:
         val = None
 
     return val
@@ -44,8 +40,8 @@ def get_user_identity(event):
 
 def get_principal(event):
     """Gets principal id from the event"""
-    ui = get_user_identity(event)
-    return ui.get('principalId', '').split(':')[-1]
+    user_identity = get_user_identity(event)
+    return user_identity.get('principalId', '').split(':')[-1]
 
 
 def get_region(event):
@@ -69,6 +65,7 @@ def get_collected_details(event):
 
 
 def get_historical_base_info(event):
+    """Gets the base details from the CloudWatch Event."""
     data = {
         'principalId': get_principal(event),
         'userIdentity': get_user_identity(event),
@@ -85,4 +82,3 @@ def get_historical_base_info(event):
         data['eventSource'] = event['detail']['eventSource']
 
     return data
-

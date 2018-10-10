@@ -11,20 +11,13 @@ import time
 from datetime import datetime
 
 import boto3
-from mock import patch
+from mock import patch  # pylint: disable=E0401
 
 from historical.common.sqs import get_queue_url
 from historical.models import HistoricalPollerTaskEventModel
 from historical.security_group.models import VERSION
-from historical.tests.factories import (
-    CloudwatchEventFactory,
-    DetailFactory,
-    RecordsFactory,
-    DynamoDBDataFactory,
-    DynamoDBRecordFactory,
-    UserIdentityFactory,
-    serialize,
-    SQSDataFactory, SnsDataFactory)
+from historical.tests.factories import CloudwatchEventFactory, DetailFactory, DynamoDBDataFactory, \
+    DynamoDBRecordFactory, RecordsFactory, serialize, SnsDataFactory, SQSDataFactory, UserIdentityFactory
 
 SECURITY_GROUP = {
     'arn': 'arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568',
@@ -105,7 +98,9 @@ SECURITY_GROUP = {
 }
 
 
+# pylint: disable=W0613
 def test_current_table(current_security_group_table):
+    """Tests for the Current PynamoDB model."""
     from historical.security_group.models import CurrentSecurityGroupModel
 
     CurrentSecurityGroupModel(**SECURITY_GROUP).save()
@@ -117,22 +112,24 @@ def test_current_table(current_security_group_table):
     assert items[0].ttl > 0
 
 
+# pylint: disable=W0613
 def test_durable_table(durable_security_group_table):
+    """Tests for the Durable PynamoDB model."""
     from historical.security_group.models import DurableSecurityGroupModel
 
     # we are explicit about our eventTimes because as RANGE_KEY it will need to be unique.
-    sg = SECURITY_GROUP.copy()
-    sg['eventTime'] = datetime(2017, 5, 11, 23, 30)
-    sg.pop("eventSource")
-    DurableSecurityGroupModel(**sg).save()
+    security_group = SECURITY_GROUP.copy()
+    security_group['eventTime'] = datetime(2017, 5, 11, 23, 30)
+    security_group.pop("eventSource")
+    DurableSecurityGroupModel(**security_group).save()
 
     items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
     assert len(items) == 1
     assert not getattr(items[0], "ttl", None)
 
-    sg['eventTime'] = datetime(2017, 5, 12, 23, 30)
-    DurableSecurityGroupModel(**sg).save()
+    security_group['eventTime'] = datetime(2017, 5, 12, 23, 30)
+    DurableSecurityGroupModel(**security_group).save()
 
     items = list(DurableSecurityGroupModel.query('arn:aws:ec2:us-east-1:123456789012:security-group/sg-1234568'))
 
@@ -150,13 +147,15 @@ def make_poller_events():
     messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)['Messages']
 
     # 'Body' needs to be made into 'body' for proper parsing later:
-    for m in messages:
-        m['body'] = m.pop('Body')
+    for msg in messages:
+        msg['body'] = msg.pop('Body')
 
     return messages
 
 
+# pylint: disable=W0613
 def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_accounts):
+    """Test the Poller tasker."""
     from historical.common.accounts import get_historical_accounts
     from historical.constants import CURRENT_REGION
 
@@ -169,7 +168,9 @@ def test_poller_tasker_handler(mock_lambda_environment, historical_sqs, swag_acc
     assert poller_events['region'] == CURRENT_REGION
 
 
+# pylint: disable=W0613
 def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_environment, security_groups, swag_accounts):
+    """Test the Poller's processing component that tasks the collector."""
     # Mock this so it returns a `NextToken`:
     def mock_describe_security_groups(**kwargs):
         from cloudaux.aws.ec2 import describe_security_groups
@@ -184,8 +185,8 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
 
         return result
 
-    p = patch('historical.security_group.poller.describe_security_groups', mock_describe_security_groups)
-    p.start()
+    patch_sgs = patch('historical.security_group.poller.describe_security_groups', mock_describe_security_groups)
+    patch_sgs.start()
 
     from historical.security_group.poller import poller_processor_handler as handler
     from historical.common import cloudwatch
@@ -205,8 +206,8 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
     assert len(messages) == 3
 
     # Verify that the region is properly propagated through, and that we got the collected data:
-    for m in messages:
-        body = json.loads(m['Body'])
+    for msg in messages:
+        body = json.loads(msg['Body'])
         assert cloudwatch.get_region(body) == 'us-east-1'
         assert body['detail']['collected']['OwnerId'] == '123456789012'
         assert not body['detail']['collected'].get('ResponseMetadata')
@@ -221,10 +222,12 @@ def test_poller_processor_handler(historical_sqs, historical_role, mock_lambda_e
     messages[0]['body'] = messages[0]['Body']   # Need to change the casing
     handler({'Records': messages}, mock_lambda_environment)
 
-    p.stop()
+    patch_sgs.stop()
 
 
+# pylint: disable=W0613,R0915
 def test_differ(current_security_group_table, durable_security_group_table, mock_lambda_environment):
+    """Tests the Differ."""
     from historical.security_group.models import DurableSecurityGroupModel
     from historical.security_group.differ import handler
     from historical.models import TTL_EXPIRY
@@ -266,12 +269,11 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=11, minute=30, second=0).isoformat() + 'Z'
     updated_group['configuration']['Description'] = 'changeme'
     updated_group["ttl"] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=updated_group,
-        Keys={
-            'arn': SECURITY_GROUP['arn']
-        }
-    ), eventName='MODIFY'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=updated_group, Keys={'arn': SECURITY_GROUP['arn']}),
+            eventName='MODIFY'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -282,12 +284,11 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     updated_group['eventTime'] = datetime(year=2017, month=5, day=12, hour=9, minute=30, second=0).isoformat() + 'Z'
     updated_group['configuration']['IpPermissions'][0]['IpRanges'][0]['CidrIp'] = 'changeme'
     updated_group["ttl"] = ttl
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=updated_group,
-        Keys={
-            'arn': SECURITY_GROUP['arn']
-        }
-    ), eventName='MODIFY'), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=updated_group, Keys={'arn': SECURITY_GROUP['arn']}),
+            eventName='MODIFY'),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
@@ -299,55 +300,50 @@ def test_differ(current_security_group_table, durable_security_group_table, mock
     deleted_group["ttl"] = ttl
 
     # ensure new record
-    data = json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        OldImage=deleted_group,
-        Keys={
-            'arn': SECURITY_GROUP['arn']
-        }),
-        eventName='REMOVE',
-        userIdentity=UserIdentityFactory(
-                type='Service',
-                principalId='dynamodb.amazonaws.com'
-        )), default=serialize)
+    data = json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(OldImage=deleted_group, Keys={'arn': SECURITY_GROUP['arn']}),
+            eventName='REMOVE',
+            userIdentity=UserIdentityFactory(type='Service', principalId='dynamodb.amazonaws.com')),
+        default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=json.dumps(SnsDataFactory(Message=data), default=serialize))])
     data = json.loads(json.dumps(data, default=serialize))
     handler(data, mock_lambda_environment)
     assert DurableSecurityGroupModel.count() == 4
 
 
+# pylint: disable=W0613
 def test_collector(historical_role, mock_lambda_environment, historical_sqs, security_groups,
                    current_security_group_table):
+    """Tests the Collector."""
     # This should NOT be called at first:
     def mock_describe_security_groups(**kwargs):
         assert False
 
-    p = patch('historical.security_group.collector.describe_security_groups', mock_describe_security_groups)
-    p.start()
+    patch_sgs = patch('historical.security_group.collector.describe_security_groups', mock_describe_security_groups)
+    patch_sgs.start()
 
     from historical.security_group.models import CurrentSecurityGroupModel
     from historical.security_group.collector import handler
     from cloudaux.aws.ec2 import describe_security_groups
     sg_details = describe_security_groups(
-            account_number='012345678910',
-            assume_role='Historical',
-            region='us-east-1',
-            GroupIds=[security_groups['GroupId']]
-        )['SecurityGroups'][0]
+        account_number='012345678910',
+        assume_role='Historical',
+        region='us-east-1',
+        GroupIds=[security_groups['GroupId']])['SecurityGroups'][0]
 
     event = CloudwatchEventFactory(
         detail=DetailFactory(
             requestParameters={'groupId': security_groups['GroupId']},
             eventName='Poller',
-            collected=sg_details
-        )
-    )
+            collected=sg_details))
     data = json.dumps(event, default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=data)])
     data = json.dumps(data, default=serialize)
     data = json.loads(data)
 
     handler(data, mock_lambda_environment)
-    p.stop()
+    patch_sgs.stop()
     group = list(CurrentSecurityGroupModel.scan())
     assert len(group) == 1
 

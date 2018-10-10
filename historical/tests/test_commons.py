@@ -10,16 +10,16 @@ import os
 
 from datetime import datetime
 
-import pytest
 from swag_client.backend import SWAGManager
 from swag_client.util import parse_swag_config_options
+import pytest  # pylint: disable=E0401
 
 from historical.common.exceptions import DurableItemIsMissingException
 from historical.constants import EVENT_TOO_BIG_FLAG
 from historical.s3.collector import process_update_records
 from historical.s3.models import VERSION
-from historical.tests.factories import CloudwatchEventFactory, DetailFactory, serialize, DynamoDBRecordFactory, \
-    DynamoDBDataFactory
+from historical.tests.factories import CloudwatchEventFactory, DetailFactory, DynamoDBDataFactory, \
+    DynamoDBRecordFactory, serialize
 
 S3_BUCKET = {
     "arn": "arn:aws:s3:::testbucket1",
@@ -76,18 +76,19 @@ S3_BUCKET = {
 }
 
 
+# pylint: disable=W0613
 def test_deserialize_current_record_to_current_model(historical_role, current_s3_table, buckets):
+    """Tests that a current table event can be deserialized back into proper Current record object."""
     from historical.common.dynamodb import deserialize_current_record_to_current_model
     from historical.s3.models import CurrentS3Model
 
     # Create the event to fetch the Current data from:
     bucket = S3_BUCKET.copy()
     bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': bucket['arn']
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': bucket['arn']}), eventName='INSERT'),
+        default=serialize))
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
     assert result.BucketName == "testbucket1"
@@ -96,24 +97,21 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
     # And for event_too_big:
     # Create the bucket in the current table:
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
-    create_event = json.loads(json.dumps(CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            eventSource="aws.s3",
-            eventName="CreateBucket",
-            eventTime=now
-        )
-    ), default=serialize))
+    create_event = json.loads(json.dumps(
+        CloudwatchEventFactory(
+            detail=DetailFactory(
+                requestParameters={"bucketName": "testbucket1"},
+                eventSource="aws.s3",
+                eventName="CreateBucket",
+                eventTime=now)),
+        default=serialize))
     process_update_records([create_event])
 
     del bucket['configuration']
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': bucket['arn']
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': bucket['arn']}), eventName='INSERT'),
+        default=serialize))
     ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
@@ -121,18 +119,19 @@ def test_deserialize_current_record_to_current_model(historical_role, current_s3
     assert isinstance(result, CurrentS3Model)
 
     # And if the object isn't in the current table:
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': 'arn:aws:s3:::notarealbucket'
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': 'arn:aws:s3:::notarealbucket'}), eventName='INSERT'),
+        default=serialize))
     ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_current_record_to_current_model(ddb_record, CurrentS3Model)
     assert not result
 
 
+# pylint: disable=W0613
 def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3_table, buckets):
+    """Tests that a durable table event can be deserialized back into proper Durable record object."""
     from historical.common.dynamodb import deserialize_durable_record_to_durable_model, \
         deserialize_current_record_to_durable_model
     from historical.s3.models import CurrentS3Model, DurableS3Model
@@ -141,11 +140,10 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
     bucket = S3_BUCKET.copy()
     del bucket['eventSource']
     bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': bucket['arn']
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': bucket['arn']}), eventName='INSERT'),
+        default=serialize))
     result = deserialize_durable_record_to_durable_model(ddb_record, DurableS3Model)
     assert result
     assert result.BucketName == "testbucket1"
@@ -154,11 +152,10 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
 
     # And for event_too_big:
     # Create the bucket in the durable table:
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': bucket['arn']
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': bucket['arn']}), eventName='INSERT'),
+        default=serialize))
     revision = deserialize_current_record_to_durable_model(ddb_record, CurrentS3Model, DurableS3Model)
     revision.save()
     ddb_record[EVENT_TOO_BIG_FLAG] = True
@@ -171,11 +168,13 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
     assert isinstance(result, DurableS3Model)
 
     # And if the object isn't in the durable table:
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': 'arn:aws:s3:::notarealbucket'
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(
+                NewImage=bucket,
+                Keys={'arn': 'arn:aws:s3:::notarealbucket'}),
+            eventName='INSERT'),
+        default=serialize))
     ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     # Raises an exception:
@@ -183,7 +182,9 @@ def test_deserialize_durable_record_to_durable_model(historical_role, durable_s3
         deserialize_durable_record_to_durable_model(ddb_record, DurableS3Model)
 
 
+# pylint: disable=W0613
 def test_deserialize_durable_record_to_current_model(historical_role, current_s3_table, buckets):
+    """Tests that a durable table event can be deserialized back into a Current record object."""
     from historical.common.dynamodb import deserialize_durable_record_to_current_model
     from historical.s3.models import CurrentS3Model
 
@@ -191,11 +192,10 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
     bucket = S3_BUCKET.copy()
     del bucket['eventSource']
     bucket['eventTime'] = datetime(year=2017, month=5, day=12, hour=10, minute=30, second=0).isoformat() + 'Z'
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': bucket['arn']
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': bucket['arn']}), eventName='INSERT'),
+        default=serialize))
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
     assert result.BucketName == "testbucket1"
@@ -204,24 +204,21 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
     # And for event_too_big:
     # Create the bucket in the Current table:
     now = datetime.utcnow().replace(tzinfo=None, microsecond=0)
-    create_event = json.loads(json.dumps(CloudwatchEventFactory(
-        detail=DetailFactory(
-            requestParameters={
-                "bucketName": "testbucket1"
-            },
-            eventSource="aws.s3",
-            eventName="CreateBucket",
-            eventTime=now
-        )
-    ), default=serialize))
+    create_event = json.loads(json.dumps(
+        CloudwatchEventFactory(
+            detail=DetailFactory(
+                requestParameters={"bucketName": "testbucket1"},
+                eventSource="aws.s3",
+                eventName="CreateBucket",
+                eventTime=now)),
+        default=serialize))
     process_update_records([create_event])
 
     del bucket['configuration']
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': bucket['arn']
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(NewImage=bucket, Keys={'arn': bucket['arn']}), eventName='INSERT'),
+        default=serialize))
 
     ddb_record[EVENT_TOO_BIG_FLAG] = True
 
@@ -231,18 +228,20 @@ def test_deserialize_durable_record_to_current_model(historical_role, current_s3
     assert isinstance(result, CurrentS3Model)
 
     # And if the object isn't in the durable table:
-    ddb_record = json.loads(json.dumps(DynamoDBRecordFactory(dynamodb=DynamoDBDataFactory(
-        NewImage=bucket, Keys={
-            'arn': 'arn:aws:s3:::notarealbucket'
-        }),
-        eventName='INSERT'), default=serialize))
+    ddb_record = json.loads(json.dumps(
+        DynamoDBRecordFactory(
+            dynamodb=DynamoDBDataFactory(
+                NewImage=bucket, Keys={'arn': 'arn:aws:s3:::notarealbucket'}), eventName='INSERT'),
+        default=serialize))
     ddb_record[EVENT_TOO_BIG_FLAG] = True
 
     result = deserialize_durable_record_to_current_model(ddb_record, CurrentS3Model)
     assert not result
 
 
+# pylint: disable=W0613
 def test_get_only_test_accounts(swag_accounts):
+    """Tests that the SWAG logic will only return 'test' accounts if specified."""
     from historical.common.accounts import get_historical_accounts
 
     # Setup:
@@ -324,6 +323,7 @@ def test_get_only_test_accounts(swag_accounts):
 
 
 def test_serialization():
+    """Tests that the dictionary serialization for PynamoDB objects works properly."""
     from historical.s3.models import CurrentS3Model
 
     bucket = S3_BUCKET.copy()

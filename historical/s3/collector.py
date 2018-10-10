@@ -14,14 +14,14 @@ from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.orchestration.aws.s3 import get_bucket
 
 from historical.common.sqs import group_records_by_type
-from historical.constants import HISTORICAL_ROLE, CURRENT_REGION, LOGGING_LEVEL
+from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records
 from historical.s3.models import CurrentS3Model, VERSION
 
 logging.basicConfig()
-log = logging.getLogger('historical')
-log.setLevel(LOGGING_LEVEL)
+LOG = logging.getLogger('historical')
+LOG.setLevel(LOGGING_LEVEL)
 
 
 UPDATE_EVENTS = [
@@ -54,8 +54,8 @@ DELETE_EVENTS = [
 
 def create_delete_model(record):
     """Create an S3 model from a record."""
-    arn = 'arn:aws:s3:::{}'.format(cloudwatch.filter_request_parameters('bucketName', record))
-    log.debug('[-] Deleting Dynamodb Records. Hash Key: {arn}'.format(arn=arn))
+    arn = f"arn:aws:s3:::{cloudwatch.filter_request_parameters('bucketName', record)}"
+    LOG.debug(f'[-] Deleting Dynamodb Records. Hash Key: {arn}')
 
     data = {
         'arn': arn,
@@ -76,8 +76,8 @@ def create_delete_model(record):
 
 def process_delete_records(delete_records):
     """Process the requests for S3 bucket deletions"""
-    for r in delete_records:
-        arn = 'arn:aws:s3:::{}'.format(r['detail']['requestParameters']['bucketName'])
+    for rec in delete_records:
+        arn = f"arn:aws:s3:::{rec['detail']['requestParameters']['bucketName']}"
 
         # Need to check if the event is NEWER than the previous event in case
         # events are out of order. This could *possibly* happen if something
@@ -86,14 +86,14 @@ def process_delete_records(delete_records):
         # if the current event timestamp is newer and will only delete if the deletion
         # event is newer.
         try:
-            log.debug('[-] Deleting bucket: {}'.format(arn))
-            model = create_delete_model(r)
-            model.save(condition=(CurrentS3Model.eventTime <= r['detail']['eventTime']))
+            LOG.debug(f'[-] Deleting bucket: {arn}')
+            model = create_delete_model(rec)
+            model.save(condition=(CurrentS3Model.eventTime <= rec['detail']['eventTime']))
             model.delete()
 
         except PynamoDBConnectionError as pdce:
-            log.warn("[?] Unable to delete bucket: {}. Either it doesn't exist, or this deletion event is stale "
-                     "(arrived before a NEWER creation/update). The specific exception is: {}".format(arn, pdce))
+            LOG.warning(f"[?] Unable to delete bucket: {arn}. Either it doesn't exist, or this deletion event is stale "
+                        f"(arrived before a NEWER creation/update). The specific exception is: {pdce}")
 
 
 def process_update_records(update_records):
@@ -106,48 +106,48 @@ def process_update_records(update_records):
 
         # Grab the bucket names (de-dupe events):
         buckets = {}
-        for e in events:
+        for event in events:
             # If the creation date is present, then use it:
-            bucket_event = buckets.get(e['detail']['requestParameters']['bucketName'], {
-                'creationDate': e['detail']['requestParameters'].get('creationDate')
+            bucket_event = buckets.get(event['detail']['requestParameters']['bucketName'], {
+                'creationDate': event['detail']['requestParameters'].get('creationDate')
             })
-            bucket_event.update(e['detail']['requestParameters'])
+            bucket_event.update(event['detail']['requestParameters'])
 
-            buckets[e['detail']['requestParameters']['bucketName']] = bucket_event
-            buckets[e['detail']['requestParameters']['bucketName']]['eventDetails'] = e
+            buckets[event['detail']['requestParameters']['bucketName']] = bucket_event
+            buckets[event['detail']['requestParameters']['bucketName']]['eventDetails'] = event
 
         # Query AWS for current configuration
-        for b, item in buckets.items():
-            log.debug('[~] Processing Create/Update for: {}'.format(b))
+        for b_name, item in buckets.items():
+            LOG.debug(f'[~] Processing Create/Update for: {b_name}')
             # If the bucket does not exist, then simply drop the request --
             # If this happens, there is likely a Delete event that has occurred and will be processed soon.
             try:
-                bucket_details = get_bucket(b,
+                bucket_details = get_bucket(b_name,
                                             account_number=account_id,
                                             include_created=(item.get('creationDate') is None),
                                             assume_role=HISTORICAL_ROLE,
                                             region=CURRENT_REGION)
                 if bucket_details.get('Error'):
-                    log.error('[X] Unable to fetch details about bucket: {}. '
-                              'The error details are: {}'.format(b, bucket_details['Error']))
+                    LOG.error(f"[X] Unable to fetch details about bucket: {b_name}. "
+                              f"The error details are: {bucket_details['Error']}")
                     continue
 
-            except ClientError as ce:
-                if ce.response['Error']['Code'] == 'NoSuchBucket':
-                    log.warning('[?] Received update request for bucket: {} that does not '
-                                'currently exist. Skipping.'.format(b))
+            except ClientError as cerr:
+                if cerr.response['Error']['Code'] == 'NoSuchBucket':
+                    LOG.warning(f'[?] Received update request for bucket: {b_name} that does not '
+                                'currently exist. Skipping.')
                     continue
 
                 # Catch Access Denied exceptions as well:
-                if ce.response['Error']['Code'] == 'AccessDenied':
-                    log.error('[X] Unable to fetch details for S3 Bucket: {} in {}. Access is Denied. '
-                              'Skipping...'.format(b, account_id))
+                if cerr.response['Error']['Code'] == 'AccessDenied':
+                    LOG.error(f'[X] Unable to fetch details for S3 Bucket: {b_name} in {account_id}. Access is Denied. '
+                              'Skipping...')
                     continue
-                raise Exception(ce)
+                raise Exception(cerr)
 
             # Pull out the fields we want:
             data = {
-                'arn': 'arn:aws:s3:::{}'.format(b),
+                'arn': f'arn:aws:s3:::{b_name}',
                 'principalId': cloudwatch.get_principal(item['eventDetails']),
                 'userIdentity': cloudwatch.get_user_identity(item['eventDetails']),
                 'userAgent': item['eventDetails']['detail'].get('userAgent'),
@@ -155,7 +155,7 @@ def process_update_records(update_records):
                 'requestParameters': item['eventDetails']['detail'].get('requestParameters'),
                 'accountId': account_id,
                 'eventTime': item['eventDetails']['detail']['eventTime'],
-                'BucketName': b,
+                'BucketName': b_name,
                 'Region': bucket_details.pop('Region'),
                 # Duplicated in top level and configuration for secondary index
                 'Tags': bucket_details.pop('Tags', {}) or {},
@@ -179,7 +179,7 @@ def process_update_records(update_records):
 
 
 @RavenLambdaWrapper()
-def handler(event, context):
+def handler(event, context):  # pylint: disable=W0613
     """
     Historical S3 event collector.
 
@@ -191,12 +191,12 @@ def handler(event, context):
     # We don't want to query for deleted records.
     update_records, delete_records = group_records_by_type(records, UPDATE_EVENTS)
 
-    log.debug('[@] Processing update records...')
+    LOG.debug('[@] Processing update records...')
     process_update_records(update_records)
-    log.debug('[@] Completed processing of update records.')
+    LOG.debug('[@] Completed processing of update records.')
 
-    log.debug('[@] Processing delete records...')
+    LOG.debug('[@] Processing delete records...')
     process_delete_records(delete_records)
-    log.debug('[@] Completed processing of delete records.')
+    LOG.debug('[@] Completed processing of delete records.')
 
-    log.debug('[@] Successfully updated current Historical table')
+    LOG.debug('[@] Successfully updated current Historical table')

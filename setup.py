@@ -6,15 +6,10 @@ Allows for the tracking of AWS configuration data across accounts/regions/techno
 
 """
 import os.path
-import sys
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__)))
-
-# When executing the setup.py, we need to be able to import ourselves, this
-# means that we need to add the src/ directory to the sys.path.
-sys.path.insert(0, ROOT)
 
 about = {}
 with open(os.path.join(ROOT, "historical", "__about__.py")) as f:
@@ -30,16 +25,19 @@ install_requires = [
     'raven-python-lambda>=0.1.7',
     'marshmallow>=2.13.5',
     'swag-client==0.4.3',
-    'python-dateutil==2.6.1'
+    'python-dateutil==2.6.1',
+    'Jinja2==2.10'
 ]
 
 tests_require = [
+    'cookiecutter==1.6.0',
     'pytest==3.1.3',
     'pytest-cov>=2.5.1',
+    'mock==2.0.0',
     'moto>=1.3.2',
     'coveralls==1.1',
     'factory-boy==2.9.2',
-    'tox==3.4.0'
+    'tox==3.4.0',
 ]
 
 
