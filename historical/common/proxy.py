@@ -112,7 +112,7 @@ def handler(event, context):  # pylint: disable=W0613
     if items_to_ship:
         # SQS:
         if queue_url:
-            produce_events(items_to_ship, queue_url)
+            produce_events(items_to_ship, queue_url, batch_size=int(os.environ.get('PROXY_BATCH_SIZE', 10)))
 
         # SNS:
         else:
