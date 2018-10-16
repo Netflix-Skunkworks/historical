@@ -334,3 +334,295 @@ def test_serialization():
 
     assert dictionary['version'] == VERSION
     assert dictionary['configuration']['LifecycleRules'][0]['Prefix'] is None
+
+
+def test_default_diff():
+    """Tests that the default_diff properly ignores the non-important fields (for diffing)"""
+    from historical.common.dynamodb import default_diff
+
+    config_one = json.loads("""{
+        "BucketName": {
+            "S": "some-bucket"
+        },
+        "Region": {
+            "S": "us-west-2"
+        },
+        "Tags": {
+            "M": {
+                "some-tag": {
+                    "S": "some-value"
+                }
+            }
+        },
+        "accountId": {
+            "S": "012345678912"
+        },
+        "configuration": {
+            "M": {
+                "Acceleration": {
+                    "NULL": true
+                },
+                "AnalyticsConfigurations": {
+                    "L": []
+                },
+                "Cors": {
+                    "L": []
+                },
+                "CreationDate": {
+                    "S": "2018-10-16T16:00:59Z"
+                },
+                "Grants": {
+                    "M": {
+                        "PKSDAJFOISDUF089U2309PRIUP2O3I98R2903840239IURIOPWIU0923489230": {
+                            "L": [
+                                {
+                                    "S": "FULL_CONTROL"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "InventoryConfigurations": {
+                    "L": []
+                },
+                "LifecycleRules": {
+                    "L": []
+                },
+                "Logging": {
+                    "M": {
+                        "Enabled": {
+                            "BOOL": false
+                        }
+                    }
+                },
+                "MetricsConfigurations": {
+                    "L": []
+                },
+                "Notifications": {
+                    "M": {}
+                },
+                "Owner": {
+                    "M": {
+                        "ID": {
+                            "S": "PKSDAJFOISDUF089U2309PRIUP2O3I98R2903840239IURIOPWIU0923489230"
+                        }
+                    }
+                },
+                "Policy": {
+                    "NULL": true
+                },
+                "Replication": {
+                    "M": {}
+                },
+                "Versioning": {
+                    "M": {}
+                },
+                "Website": {
+                    "NULL": true
+                }
+            }
+        },
+        "requestParameters": {
+            "M": {
+                "bucketName": {
+                    "S": "some-bucket"
+                },
+                "creationDate": {
+                    "S": "2018-10-16T16:00:59Z"
+                }
+            }
+        },
+        "userIdentity": {
+            "M": {}
+        },
+        "version": {
+            "N": "9"
+        }
+    }""")
+
+    config_two = json.loads("""{
+        "BucketName": {
+            "S": "some-bucket"
+        },
+        "Region": {
+            "S": "us-west-2"
+        },
+        "Tags": {
+            "M": {
+                "some-tag": {
+                    "S": "some-value"
+                }
+            }
+        },
+        "accountId": {
+            "S": "012345678912"
+        },
+        "configuration": {
+            "M": {
+                "Acceleration": {
+                    "NULL": true
+                },
+                "AnalyticsConfigurations": {
+                    "L": []
+                },
+                "Cors": {
+                    "L": []
+                },
+                "CreationDate": {
+                    "S": "2018-10-16T16:00:59Z"
+                },
+                "Grants": {
+                    "M": {
+                        "PKSDAJFOISDUF089U2309PRIUP2O3I98R2903840239IURIOPWIU0923489230": {
+                            "L": [
+                                {
+                                    "S": "FULL_CONTROL"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "InventoryConfigurations": {
+                    "L": []
+                },
+                "LifecycleRules": {
+                    "L": []
+                },
+                "Logging": {
+                    "M": {
+                        "Enabled": {
+                            "BOOL": false
+                        }
+                    }
+                },
+                "MetricsConfigurations": {
+                    "L": []
+                },
+                "Notifications": {
+                    "M": {}
+                },
+                "Owner": {
+                    "M": {
+                        "ID": {
+                            "S": "PKSDAJFOISDUF089U2309PRIUP2O3I98R2903840239IURIOPWIU0923489230"
+                        }
+                    }
+                },
+                "Policy": {
+                    "NULL": true
+                },
+                "Replication": {
+                    "M": {}
+                },
+                "Versioning": {
+                    "M": {}
+                },
+                "Website": {
+                    "NULL": true
+                }
+            }
+        },
+        "principalId": {
+          "S": "someperson"
+        },
+        "requestParameters": {
+          "M": {
+            "BucketLoggingStatus": {
+              "M": {
+                "LoggingEnabled": {
+                  "M": {
+                    "TargetBucket": {
+                      "S": "some-log-bucket"
+                    },
+                    "TargetPrefix": {
+                      "S": "some-bucket/"
+                    }
+                  }
+                },
+                "xmlns": {
+                  "S": "http://s3.amazonaws.com/doc/2006-03-01/"
+                }
+              }
+            },
+            "bucketName": {
+              "S": "some-bucket"
+            },
+            "logging": {
+              "L": [
+                {
+                  "S": "<empty>"
+                }
+              ]
+            }
+          }
+        },
+        "sourceIpAddress": {
+          "S": "::1"
+        },
+        "userAgent": {
+          "S": "[Boto3/1.7.79 Python/3.6.1 Linux/4.14.72-68.55.amzn1.x86_64 exec-env/AWS_Lambda_python3.6 Botocore/1.10.84]"
+        },
+        "userIdentity": {
+          "M": {
+            "accessKeyId": {
+              "S": "LAKSJDFKLADSJFJK"
+            },
+            "accountId": {
+              "S": "012345678912"
+            },
+            "arn": {
+              "S": "arn:aws:sts::012345678912:assumed-role/SomeIAMRole/somesessionname"
+            },
+            "principalId": {
+              "S": "LAKSJDFKLADSJFJK:somesessionname"
+            },
+            "sessionContext": {
+              "M": {
+                "attributes": {
+                  "M": {
+                    "creationDate": {
+                      "S": "2018-10-16T16:00:57Z"
+                    },
+                    "mfaAuthenticated": {
+                      "S": "false"
+                    }
+                  }
+                },
+                "sessionIssuer": {
+                  "M": {
+                    "accountId": {
+                      "S": "012345678912"
+                    },
+                    "arn": {
+                      "S": "arn:aws:iam::012345678912:role/SomeIAMRole"
+                    },
+                    "principalId": {
+                      "S": "LAKSJDFKLADSJFJK"
+                    },
+                    "type": {
+                      "S": "Role"
+                    },
+                    "userName": {
+                      "S": "SomeIAMRole"
+                    }
+                  }
+                }
+              }
+            },
+            "type": {
+              "S": "AssumedRole"
+            }
+          }
+        },
+        "version": {
+            "N": "9"
+        }
+    }""")
+
+    assert not default_diff(config_one, config_two)
+
+    # Change something:
+    config_two['version']['N'] = "10"
+    result = default_diff(config_one, config_two)
+    assert result['values_changed']["root['version']['N']"]['new_value'] == '10'
+    assert result['values_changed']["root['version']['N']"]['old_value'] == '9'

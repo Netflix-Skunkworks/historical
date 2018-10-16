@@ -7,7 +7,6 @@
 """
 import logging
 
-from deepdiff import DeepDiff
 from raven_python_lambda import RavenLambdaWrapper
 
 from historical.common.util import deserialize_records
@@ -20,18 +19,7 @@ LOG = logging.getLogger('historical')
 LOG.setLevel(LOGGING_LEVEL)
 
 # Path to where in the dict the ephemeral field is -- starting with "root['M'][PathInConfigDontForgetDataType]..."
-EPHEMERAL_PATHS = []
-
-
-def is_new_revision(latest_revision, current_revision):
-    """Determine if two revisions have actually changed."""
-    diff = DeepDiff(
-        current_revision,
-        latest_revision,
-        exclude_paths=EPHEMERAL_PATHS,
-        ignore_order=True
-    )
-    return diff
+# EPHEMERAL_PATHS = []
 
 
 @RavenLambdaWrapper()
@@ -46,4 +34,4 @@ def handler(event, context):  # pylint: disable=W0613
     records = deserialize_records(event['Records'])
 
     for record in records:
-        process_dynamodb_differ_record(record, CurrentS3Model, DurableS3Model, diff_func=is_new_revision)
+        process_dynamodb_differ_record(record, CurrentS3Model, DurableS3Model)
