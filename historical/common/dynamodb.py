@@ -32,12 +32,22 @@ Thus, a Durable object is a subset of a Current object.
 
 def default_diff(latest_config, current_config):
     """Determine if two revisions have actually changed."""
+    # Pop off the fields we don't care about:
+    pop_no_diff_fields(latest_config, current_config)
+
     diff = DeepDiff(
         latest_config,
         current_config,
         ignore_order=True
     )
     return diff
+
+
+def pop_no_diff_fields(latest_config, current_config):
+    """Pops off fields that should not be included in the diff."""
+    for field in ['userIdentity', 'principalId', 'userAgent', 'sourceIpAddress', 'requestParameters']:
+        latest_config.pop(field, None)
+        current_config.pop(field, None)
 
 
 def remove_global_dynamo_specific_fields(obj):
