@@ -36,9 +36,9 @@ DELETE_EVENTS = [
 ]
 
 
-def get_arn(vpc_id, account_id):
+def get_arn(vpc_id, region, account_id):
     """Creates a vpc ARN."""
-    return f'arn:aws:ec2:{CURRENT_REGION}:{account_id}:vpc/{vpc_id}'
+    return f'arn:aws:ec2:{region}:{account_id}:vpc/{vpc_id}'
 
 
 def describe_vpc(record):
@@ -81,7 +81,7 @@ def create_delete_model(record):
 
     vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
 
-    arn = get_arn(vpc_id, record['account'])
+    arn = get_arn(vpc_id, cloudwatch.get_region(record), record['account'])
 
     LOG.debug(F'[-] Deleting Dynamodb Records. Hash Key: {arn}')
 
@@ -143,7 +143,7 @@ def capture_update_records(records):
         LOG.debug(f'Processing vpc. VPC: {vpc}')
         data.update({
             'VpcId': vpc.get('VpcId'),
-            'arn': get_arn(vpc['VpcId'], data['accountId']),
+            'arn': get_arn(vpc['VpcId'], cloudwatch.get_region(record), data['accountId']),
             'configuration': vpc,
             'State': vpc.get('State'),
             'IsDefault': vpc.get('IsDefault'),

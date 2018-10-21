@@ -404,3 +404,28 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
 
     handler(data, mock_lambda_environment)
     assert CurrentSecurityGroupModel.count() == 1
+
+    # Create a security group in an off-region. Make sure that the ARN of the Security Group is correct and NOT
+    # set to the CURRENT_REGION:
+    client = boto3.client('ec2', region_name='eu-west-2')
+    sg_id = client.create_security_group(GroupName='London', Description='London', VpcId='vpc-test')['GroupId']
+    sg_details = describe_security_groups(
+        account_number='123456789012',
+        assume_role='Historical',
+        region='eu-west-2',
+        GroupIds=[sg_id])['SecurityGroups'][0]
+
+    event = CloudwatchEventFactory(
+        detail=DetailFactory(
+            requestParameters={'groupId': sg_id},
+            eventName='Poller',
+            awsRegion='eu-west-2',
+            collected=sg_details))
+    data = json.dumps(event, default=serialize)
+    data = RecordsFactory(records=[SQSDataFactory(body=data)])
+    data = json.dumps(data, default=serialize)
+    data = json.loads(data)
+
+    handler(data, mock_lambda_environment)
+    group = list(CurrentSecurityGroupModel.query(f'arn:aws:ec2:eu-west-2:123456789012:security-group/{sg_id}'))
+    assert len(group) == 1

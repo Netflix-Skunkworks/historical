@@ -39,9 +39,9 @@ DELETE_EVENTS = [
 ]
 
 
-def get_arn(group_id, account_id):
+def get_arn(group_id, region, account_id):
     """Creates a security group ARN."""
-    return f'arn:aws:ec2:{CURRENT_REGION}:{account_id}:security-group/{group_id}'
+    return f'arn:aws:ec2:{region}:{account_id}:security-group/{group_id}'
 
 
 def describe_group(record, region):
@@ -100,7 +100,7 @@ def create_delete_model(record):
     # vpc_id = cloudwatch.filter_request_parameters('vpcId', record)
     # group_name = cloudwatch.filter_request_parameters('groupName', record)
 
-    arn = get_arn(group_id, record['account'])
+    arn = get_arn(group_id, cloudwatch.get_region(record), record['account'])
 
     LOG.debug(f'[-] Deleting Dynamodb Records. Hash Key: {arn}')
 
@@ -153,7 +153,7 @@ def capture_update_records(records):
             'GroupId': group['GroupId'],
             'GroupName': group.pop('GroupName'),
             'VpcId': group.pop('VpcId', None),
-            'arn': get_arn(group.pop('GroupId'), group.pop('OwnerId')),
+            'arn': get_arn(group.pop('GroupId'), cloudwatch.get_region(rec), group.pop('OwnerId')),
             'Region': cloudwatch.get_region(rec)
         })
 
