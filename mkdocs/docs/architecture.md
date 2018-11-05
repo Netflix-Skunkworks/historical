@@ -1,5 +1,5 @@
 # Historical Architecture
-Historical is a serverless application in AWS. It consists of many components and are described in this document.
+Historical is a serverless AWS application that consists of many components.
 
 Historical is written in Python 3 and heavily leverages AWS technologies such as Lambda, SNS, SQS, DynamoDB, CloudTrail, and CloudWatch.
 
@@ -7,14 +7,14 @@ Historical is written in Python 3 and heavily leverages AWS technologies such as
 Here is a diagram of the Historical Architecture:
 <a href="../img/historical-overview.jpg"><img src="../img/historical-overview.jpg"></a>
 
-**Please Note:** This stack is deployed _for every technology monitored_! There are many, many Historical stacks that will be deployed!
+**Please Note:** This stack is deployed _for every technology monitored_! There are many, many Historical stacks that will be deployed.
 
 ### Polling vs. Events
-Historical is *both* a polling and event driven system. It will periodically poll AWS accounts for changes. Because Historical responds to events in the environment, polling doesn't need to be very aggressive.
+Historical is *both* a polling and event driven system. It will periodically poll AWS accounts for changes. However, because Historical responds to events in the environment, polling doesn't need to be very aggressive and only happens once every few hours.
 
-Unfortunately, events are not 100% reliable, and as such, polling is required to describe items that may have had lost events.
+Polling is necessary because events are not 100% reliable. This ensures that data is current just in case an event is dropped.
 
-Historical is *eventually consistent*, and makes a *best effort* to maintain a current and up-to-date inventory of assets.
+Historical is *eventually consistent*, and makes a *best effort* to maintain a current and up-to-date inventory of AWS resources.
 
 ## Prerequisites
 For all of this to work the following prerequisites that must be satisfied:
@@ -22,7 +22,7 @@ For all of this to work the following prerequisites that must be satisfied:
 1. **ALL AWS** accounts must be configured to send CloudWatch events over a CloudWatch Event Bus to the Historical AWS account.
 1. **ALL AWS accounts** and **ALL regions** in those accounts need to have a CloudWatch Event rule that captures ALL events and sends them over the Event Bus.
 1. **ALL AWS** accounts must have CloudTrail enabled.
-1. A `Historical` IAM role must exist in **ALL AWS** accounts with permissions that are defined **here***(TODO ADD THESE!). This role must have an `AssumeRolePolicyDocument` to permit access from the `HistoricalLambdaProfile` IAM role in the Historical Account.
+1. A `Historical` IAM role must exist in **ALL AWS accounts** with permissions that are defined **here***(TODO ADD THESE!). This role must have an `AssumeRolePolicyDocument` to permit access from the `HistoricalLambdaProfile` IAM role in the Historical Account.
 1. Historical makes use of [SWAG](https://github.com/Netflix-Skunkworks/swag-api) to define which AWS accounts Historical is enabled for. SWAG must be properly configured for Historical to operate.
 
 The CloudWatch configuration is outlined here:
@@ -38,9 +38,9 @@ Historical has the concept of regions that fit 3 categories:
 - Secondary region(s)
 - Off region(s)
 
-The **Primary Region** is considered the "Base" of Historical. This region has all the major components that make up Historical. This region is responsible for getting events from ALL the off-regions -- which are regions that don't require a full Historical stack, but would still like to receive events from.
+The **Primary Region** is considered the "Base" of Historical. This region has all of the major components that make up Historical. This region is responsible for getting events from ALL the off-regions -- which are regions that don't require a full Historical stack, but should still have events processed.
 
-The **Secondary Region(s)** are regions that are important to you. Secondary regions look like the primary region, and process events locally. If you have a lot of infrastructure in a region, you should place a Historical stack there. This will allow you to quickly receive and process events, and also gives your applications a regionally-local means of accessing Historical data.
+The **Secondary Region(s)** are regions that are important to you. Secondary regions look like the primary region, and process in-region events. If you have a lot of infrastructure within a region, you should place a Historical stack there. This will allow you to quickly receive and process events, and also gives your applications a regionally-local means of accessing Historical data.
 
 The **Off Region(s)** are regions you don't have a lot of infrastructure deployed in. However, you still want visibility in these regions should events happen there. These regions have very minimal amount of infrastructure deployed. These regions will forward ALL events to the Primary Region for processing.
 
@@ -74,7 +74,7 @@ There are two different CloudWatch Event Rules:
 1. Timed Events
 1. Change Events
 
-Timed events are used to kick off the Poller. See the section on the poller below for additional details. Change events are events that arrive from an asset in the AWS environment undergoing a change.
+Timed events are used to kick off the Poller. See the section on the poller below for additional details. Change events are events that arrive from CloudWatch Events when an AWS resource's configuration changes.
 
 ### Poller
 The Poller's primary function is to obtain a full inventory of AWS assets.
