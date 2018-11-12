@@ -45,7 +45,7 @@ def default_diff(latest_config, current_config):
 
 def pop_no_diff_fields(latest_config, current_config):
     """Pops off fields that should not be included in the diff."""
-    for field in ['userIdentity', 'principalId', 'userAgent', 'sourceIpAddress', 'requestParameters']:
+    for field in ['userIdentity', 'principalId', 'userAgent', 'sourceIpAddress', 'requestParameters', 'eventName']:
         latest_config.pop(field, None)
         current_config.pop(field, None)
 
