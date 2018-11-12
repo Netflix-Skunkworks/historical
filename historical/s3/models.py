@@ -69,7 +69,7 @@ class S3PollingEventDetail(HistoricalPollingEventDetail):
         :return:
         """
         data["eventSource"] = "historical.s3.poller"
-        data["eventName"] = "DescribeBucket"
+        data["eventName"] = "PollS3"
 
         return data
 

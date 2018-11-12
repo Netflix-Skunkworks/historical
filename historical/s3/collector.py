@@ -25,7 +25,7 @@ LOG.setLevel(LOGGING_LEVEL)
 
 
 UPDATE_EVENTS = [
-    'DescribeBucket',   # Polling event
+    'PollS3',   # Polling event
     'DeleteBucketCors',
     'DeleteBucketLifecycle',
     'DeleteBucketPolicy',
@@ -160,6 +160,7 @@ def process_update_records(update_records):
                 # Duplicated in top level and configuration for secondary index
                 'Tags': bucket_details.pop('Tags', {}) or {},
                 'eventSource': item['eventDetails']['detail']['eventSource'],
+                'eventName': item['eventDetails']['detail']['eventName'],
                 'version': VERSION
             }
 

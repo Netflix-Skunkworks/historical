@@ -60,7 +60,7 @@ class SecurityGroupPollingEventDetail(HistoricalPollingEventDetail):
         :return:
         """
         data['eventSource'] = 'historical.ec2.poller'
-        data['eventName'] = 'Poller'
+        data['eventName'] = 'PollSecurityGroups'
         return data
 
 
