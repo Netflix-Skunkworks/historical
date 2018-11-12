@@ -15,7 +15,7 @@ from raven_python_lambda import RavenLambdaWrapper
 from cloudaux.aws.ec2 import describe_security_groups
 
 from historical.common.sqs import group_records_by_type
-from historical.constants import CURRENT_REGION, HISTORICAL_ROLE, LOGGING_LEVEL
+from historical.constants import HISTORICAL_ROLE, LOGGING_LEVEL
 from historical.common import cloudwatch
 from historical.common.util import deserialize_records, pull_tag_dict
 from historical.security_group.models import CurrentSecurityGroupModel, VERSION
@@ -31,7 +31,7 @@ UPDATE_EVENTS = [
     'RevokeSecurityGroupEgress',
     'RevokeSecurityGroupIngress',
     'CreateSecurityGroup',
-    'Poller'
+    'PollSecurityGroups'
 ]
 
 DELETE_EVENTS = [

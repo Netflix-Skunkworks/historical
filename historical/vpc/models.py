@@ -74,7 +74,7 @@ class VPCPollingEventDetail(HistoricalPollingEventDetail):
         :return:
         """
         data['eventSource'] = 'historical.ec2.poller'
-        data['eventName'] = 'Poller'
+        data['eventName'] = 'PollVpc'
         return data
 
 

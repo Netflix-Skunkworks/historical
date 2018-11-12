@@ -23,6 +23,7 @@ VPC = {
     'VpcId': 'vpc-123343',
     'accountId': '123456789012',
     'eventSource': 'aws.ec2',
+    'eventName': 'CreateVpc',
     'IsDefault': True,
     'CidrBlock': 'string',
     'State': 'available',

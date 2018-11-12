@@ -36,6 +36,7 @@ S3_BUCKET = {
     "accountId": "123456789012",
     "eventTime": "2017-09-08T00:34:34Z",
     "eventSource": "aws.s3",
+    "eventName": "CreateBucket",
     "BucketName": "testbucket1",
     "Region": "us-east-1",
     "Tags": {},
@@ -109,7 +110,7 @@ def test_schema_serialization():
     # the exception is bucket creation date.
     assert loaded_serialized["detail"]["eventTime"] == loaded_data["detail"]["event_time"]
     assert loaded_serialized["detail"]["eventSource"] == loaded_data["detail"]["event_source"] == "historical.s3.poller"
-    assert loaded_serialized["detail"]["eventName"] == loaded_data["detail"]["event_name"] == "DescribeBucket"
+    assert loaded_serialized["detail"]["eventName"] == loaded_data["detail"]["event_name"] == "PollS3"
     assert loaded_serialized["detail"]["requestParameters"]["bucketName"] == \
         loaded_data["detail"]["request_parameters"]["bucket_name"] == "muhbucket"
     assert loaded_serialized["detail"]["requestParameters"]["creationDate"] == \
@@ -267,7 +268,7 @@ def test_collector(historical_role, buckets, mock_lambda_environment, swag_accou
                 "creationDate": now
             },
             eventSource="historical.s3.poller",
-            eventName="DescribeBucket",
+            eventName="PollS3",
             eventTime=now
         )
     )

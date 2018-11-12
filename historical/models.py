@@ -83,6 +83,7 @@ class AWSHistoricalMixin(BaseHistoricalModel):
     userAgent = UnicodeAttribute(null=True)
     sourceIpAddress = UnicodeAttribute(null=True)
     requestParameters = MapAttribute(null=True)
+    eventName = UnicodeAttribute(null=True)
 
 
 class HistoricalPollingEventDetail(Schema):

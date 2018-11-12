@@ -24,6 +24,7 @@ SECURITY_GROUP = {
     'GroupId': 'sg-1234568',
     'GroupName': 'testGroup',
     'eventSource': 'aws.ec2',
+    'eventName': 'CreateSecurityGroup',
     'VpcId': 'vpc-123343',
     'accountId': '123456789012',
     'Region': 'us-east-1',
@@ -335,7 +336,7 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
     event = CloudwatchEventFactory(
         detail=DetailFactory(
             requestParameters={'groupId': security_groups['GroupId']},
-            eventName='Poller',
+            eventName='PollSecurityGroups',
             collected=sg_details))
     data = json.dumps(event, default=serialize)
     data = RecordsFactory(records=[SQSDataFactory(body=data)])
@@ -418,7 +419,7 @@ def test_collector(historical_role, mock_lambda_environment, historical_sqs, sec
     event = CloudwatchEventFactory(
         detail=DetailFactory(
             requestParameters={'groupId': sg_id},
-            eventName='Poller',
+            eventName='PollSecurityGroups',
             awsRegion='eu-west-2',
             collected=sg_details))
     data = json.dumps(event, default=serialize)
