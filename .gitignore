@@ -185,3 +185,6 @@ test-reports/*
 
 ### MKDOCS ###
 mkdocs/site/
+
+# Terraform
+env.list
