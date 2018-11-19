@@ -17,7 +17,7 @@ with open(os.path.join(ROOT, "historical", "__about__.py")) as f:
 
 
 install_requires = [
-    'boto3==1.7.79',       # moto is currently broken with the latest and greatest version :(
+    'boto3>=1.9.47',
     'cloudaux>=1.4.14',
     'click>=6.7',
     'pynamodb>=3.3.1',
