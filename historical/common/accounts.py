@@ -42,6 +42,6 @@ def get_historical_accounts():
 
         accounts = swag.get_service_enabled('historical', search_filter=search_filter)
     else:
-        accounts = os.environ['ENABLED_ACCOUNTS']
+        accounts = [{'id': account_id} for account_id in os.environ['ENABLED_ACCOUNTS'].split(',')]
 
     return accounts
