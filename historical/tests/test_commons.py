@@ -626,3 +626,18 @@ def test_default_diff():
     result = default_diff(config_one, config_two)
     assert result['values_changed']["root['version']['N']"]['new_value'] == '10'
     assert result['values_changed']["root['version']['N']"]['old_value'] == '9'
+
+
+def test_get_accounts_with_env_var():
+    """Tests that passing in a CSV of account IDs in for the ENABLED_ACCOUNTS variable works."""
+    from historical.common.accounts import get_historical_accounts
+    account_ids = ['012345678910', '111111111111', '222222222222']
+    os.environ['ENABLED_ACCOUNTS'] = ','.join(account_ids)
+
+    result = get_historical_accounts()
+
+    assert len(result) == len(account_ids)
+    for account in result:
+        account_ids.remove(account['id'])
+
+    assert not account_ids
