@@ -25,10 +25,13 @@ The CloudTrail context on the change is preserved in the change history.
 
 - ### S3
 - ### Security Groups
-- ### IAM (In active development)
+- ### IAM (In active development -- Coming Soon!)
 
 ## Architecture
 Please review the [Architecture](architecture.md) documentation for an in-depth description of the components involved.
 
 ## Installation & Configuration
-Documentation is under development.
+Please review the [Installation & Configuration](installation/) documentation for details.
+
+## Troubleshooting
+Please review the [Troubleshooting](troubleshooting.md) doc if you are experiencing issues.

@@ -16,20 +16,15 @@ Polling is necessary because events are not 100% reliable. This ensures that dat
 
 Historical is *eventually consistent*, and makes a *best effort* to maintain a current and up-to-date inventory of AWS resources.
 
-## Prerequisites
-For all of this to work the following prerequisites that must be satisfied:
+## Prerequisite Overview
+
+This is an overview of the prerequisites that are required to make Historical operate. For more details on setting up the required prerequisites, please review to the [installation documentation](../installation).
 
 1. **ALL AWS** accounts must be configured to send CloudWatch events over a CloudWatch Event Bus to the Historical AWS account.
 1. **ALL AWS accounts** and **ALL regions** in those accounts need to have a CloudWatch Event rule that captures ALL events and sends them over the Event Bus.
 1. **ALL AWS** accounts must have CloudTrail enabled.
-1. A `Historical` IAM role must exist in **ALL AWS accounts** with permissions that are defined **here***(TODO ADD THESE!). This role must have an `AssumeRolePolicyDocument` to permit access from the `HistoricalLambdaProfile` IAM role in the Historical Account.
-1. Historical makes use of [SWAG](https://github.com/Netflix-Skunkworks/swag-api) to define which AWS accounts Historical is enabled for. SWAG must be properly configured for Historical to operate.
-
-The CloudWatch configuration is outlined here:
-![CW Event Bus Diagram](img/cw-events.png)
-
-The IAM configuration is outlined here:
-TODO ADD ME
+1. IAM roles must exist in **ALL** accounts and be assumable by the Historical Lambda functions.
+1. Historical makes use of [SWAG](https://github.com/Netflix-Skunkworks/swag-client) to define which AWS accounts Historical is enabled for. SWAG must be properly configured for Historical to operate. Alternatively, you can specify the AWS Account IDs that Historical will examine via an environment variable. However, it is _highly recommended_ that you make use of SWAG.
 
 ## Regions
 Historical has the concept of regions that fit 3 categories:
@@ -164,4 +159,4 @@ The secondary regions will still respond to in-region events, but lack all polli
 
 ## Installation & Configuration
 
-Please refer to the installation docs for additional details.
+Please refer to the [installation docs](../installation) for additional details.
