@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Terraform - Historical</title>
+        <link href="../../css/bootstrap-custom.min.css" rel="stylesheet">
+        <link href="../../css/font-awesome.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/color-brewer.min.css">
+        <link href="../../extra.css" rel="stylesheet">
+        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+            <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+        <![endif]-->
+
+        <script src="../../js/jquery-1.10.2.min.js" defer></script>
+        <script src="../../js/bootstrap-3.0.3.min.js" defer></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+        <script>hljs.initHighlightingOnLoad();</script> 
+    </head>
+
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+            <div class="container">
+
+                <!-- Collapsed navigation -->
+                <div class="navbar-header">
+                    <!-- Expander button -->
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="../..">Historical</a>
+                </div>
+
+                <!-- Expanded navigation -->
+                <div class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li >
+                                <a href="../..">Welcome</a>
+                            </li>
+                            <li >
+                                <a href="../../architecture/">Architecture</a>
+                            </li>
+                            <li class="dropdown active">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">Installation and Configuration <b class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    
+<li >
+    <a href="../">Instructions</a>
+</li>
+                                    
+<li >
+    <a href="../#prerequisites">Prerequisites</a>
+</li>
+                                    
+<li >
+    <a href="../iam/">IAM Setup</a>
+</li>
+                                    
+<li class="active">
+    <a href="./">Terraform</a>
+</li>
+                                    
+<li >
+    <a href="../configuration/">Configuration Reference</a>
+</li>
+                                    
+<li >
+    <a href="../#prepare-docker-container">Prepare Docker Container</a>
+</li>
+                                    
+<li >
+    <a href="../#installation">Installation</a>
+</li>
+                                    
+<li >
+    <a href="../#uninstallation">Uninstallation</a>
+</li>
+                                </ul>
+                            </li>
+                            <li >
+                                <a href="../../troubleshooting/">Troubleshooting</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav navbar-right">
+                        <li>
+                            <a href="#" data-toggle="modal" data-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li >
+                                <a rel="next" href="../iam/">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li >
+                                <a rel="prev" href="../configuration/">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://github.com/Netflix-Skunkworks/historical/"><i class="fa fa-github"></i> GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+                <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
+    <ul class="nav bs-sidenav">
+        <li class="main active"><a href="#historical-terraform-setup">Historical Terraform Setup</a></li>
+            <li><a href="#structure">Structure</a></li>
+            <li><a href="#configuration-and-environment-variables">Configuration and Environment Variables</a></li>
+            <li><a href="#next-steps">Next Steps</a></li>
+    </ul>
+</div></div>
+                <div class="col-md-9" role="main">
+
+<h1 id="historical-terraform-setup">Historical Terraform Setup<a class="headerlink" href="#historical-terraform-setup" title="Permanent link">&para;</a></h1>
+<p>A set of <strong>sample</strong> <a href="https://terraform.io">Terraform</a> templates are included to assist with the roll-out of the infrastructure. This is intended to be run within a Docker container (code also included). The Docker container will:</p>
+<ol>
+<li>Package the Historical Lambda code</li>
+<li>Run the Terraform templates to provision all of the infrastructure</li>
+</ol>
+<p>This is all run within an <a href="https://hub.docker.com/_/amazonlinux/">Amazon Linux</a> Docker container. Amazon Linux is required because Historical's dependencies make use of statically linked libraries, which will fail to run in the Lambda environment unless the binaries are built on Amazon Linux.</p>
+<p>You can also use this to uninstall Historical from your environment as well.</p>
+<p><strong>Please review each section below, as the details are very important:</strong></p>
+<h3 id="structure">Structure<a class="headerlink" href="#structure" title="Permanent link">&para;</a></h3>
+<p>The Terraform templates are split into multiple components:</p>
+<ol>
+<li><strong>Terraform Plugins</strong> (located in terraform/terraform-plugins)</li>
+<li><strong>DynamoDB</strong> (located in terraform/dynamodb)</li>
+<li><strong>Infrastructure</strong> (located in terraform/infra)</li>
+</ol>
+<h4 id="terraform-backend-configuration">Terraform Backend Configuration<a class="headerlink" href="#terraform-backend-configuration" title="Permanent link">&para;</a></h4>
+<p>We make the assumption that the Terraform backend is on S3. As such, you will need an S3 bucket that resides in the Historical AWS account. It is <strong>highly recommended</strong> that you configure the Historical Terraform S3 bucket with versioning enabled. This is needed should there ever be an issue with the Terraform state.</p>
+<p><strong>NOTE:</strong> For <strong>ALL</strong> Terraform <code>main.tf</code> template files, at the top of the template file is a backend region configuration. It looks like this:</p>
+<pre><code>    terraform {
+      backend "s3" {
+        // Set this to where your Terraform S3 bucket is located (using us-west-2 as the example):
+        region = "us-west-2"
+      }
+    }
+</code></pre>
+<p>You will need to set the region to where your Terraform S3 bucket resides. In our examples, we are making use of <code>us-west-2</code>.</p>
+<h4 id="terraform-plugins">Terraform Plugins<a class="headerlink" href="#terraform-plugins" title="Permanent link">&para;</a></h4>
+<p>This is a Terraform template that is executed in the Docker <code>build</code> step. This is done to pin the Terraform plugins to the Docker container so that they need not be re-downloaded later. It is important to keep the version numbers in this doc in sync with the rest of the templates.</p>
+<h4 id="dynamodb-templates">DynamoDB Templates<a class="headerlink" href="#dynamodb-templates" title="Permanent link">&para;</a></h4>
+<p>This is used to construct the Global DynamoDB tables used by Historical. This is structured as follows:</p>
+<ol>
+<li><code>main.tf</code> - This is the main template with the components required to build out the Global DynamoDB tables for a given Historical stack. The sample included makes an <strong>ASSUMPTION</strong> that you will be utilizing <code>us-west-2</code> as your <em>PRIMARY REGION</em>, and <code>us-east-1</code> and <code>eu-west-1</code> as your <em>SECONDARY REGIONS</em>.<ul>
+<li><strong>You will need to modify this template accordingly to change the defaults set.</strong></li>
+<li>This is used for ALL stacks. If you want to specify different primary and secondary regions for a given AWS resource type, then you will need to make your own modifications to the installation scripting to leverage different templates.</li>
+</ul>
+</li>
+<li>Per-resource type stack configurations. Included are details for S3 and Security Groups. There is a Terraform template for each resource type. This is where you can configure the read and write capacities for the tables.<ul>
+<li><strong>You will need to modify these templates accordingly to change the defaults set.</strong></li>
+<li>By default the tables are configured with a read and write capacity of <code>100</code> units. Change this as necessary.</li>
+</ul>
+</li>
+</ol>
+<p>When the installation scripts run, it copies over the resource type configuration to the same directory as the <code>main.tf</code> template. Terraform is then able to build out the infrastructure for a given resource type.</p>
+<h4 id="infrastructure">Infrastructure<a class="headerlink" href="#infrastructure" title="Permanent link">&para;</a></h4>
+<p>This is organized similar to the DynamoDB templates. This must be executed <em>after</em> the DynamoDB templates on installation and <em>before</em> the DynamoDB templates on tear-down (for uninstallation should you need to tear down the stack). This is structured as follows:</p>
+<ol>
+<li><code>main.tf</code> - This is the main template with most of the infrastructure components identified. Very few (or no) changes need to be made here.<ul>
+<li>This is used for ALL stacks.</li>
+</ul>
+</li>
+<li><code>off-regions.tf</code> - This outlines all of the off-region components that are required. This file has a duplicate of every region off-regions' components. Unfortunately, because Terraform lacks a great way to perform loops and iterations, we duplicate the configuration for each region. This makes the file very large and painful to edit. The sample included makes an <strong>ASSUMPTION</strong> that you will be utilizing <code>us-west-2</code> as your <em>PRIMARY REGION</em>, and <code>us-east-1</code> and <code>eu-west-1</code> as your <em>SECONDARY REGIONS</em>. Thus, all other regions are the off-regions in our sample. You will need to alter this should you want to change the regions for your deployment.<ul>
+<li><strong>You will need to modify this template accordingly to change the defaults set.</strong></li>
+<li>This is used for ALL stacks. If you want to specify different primary, secondary, and off-regions for a given AWS resource type, then you will need to make your own modifications to the installation scripting to leverage different templates.</li>
+</ul>
+</li>
+<li>Per-resource type stack configurations. Included are details for S3 and Security Groups. There is a Terraform template for each resource type. This is where you need to configure a number of details.<ul>
+<li><em>Most</em> of the defaults values are fine and should not be changed.</li>
+<li>You will need to set the <code>PRIMARY_REGION</code>, and <code>POLLING_REGIONS</code> variables accordingly. With the exception of S3, the <code>POLLING_REGIONS</code> should include the primary and secondary regions in the list.</li>
+<li><strong>You will need to review all of the variables and comments in the template to understand what they mean how they should be set. If you change the defaults, you will need to make updates as necessary.</strong></li>
+</ul>
+</li>
+</ol>
+<h2 id="configuration-and-environment-variables">Configuration and Environment Variables<a class="headerlink" href="#configuration-and-environment-variables" title="Permanent link">&para;</a></h2>
+<p><strong>IMPORTANT:</strong> There are many environment variables and configuration details that are required to be set. <a href="../configuration/">Please review this page for details on this</a>.</p>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>Once you have thoroughly reviewed this section, please return back to the <a href="/installation">installation documentation</a>.</p></div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js" defer></script>
+        <script src="../../search/main.js" defer></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="Search Modal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="exampleModalLabel">Search</h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    From here you can search these documents. Enter
+                    your search terms below.
+                </p>
+                <form role="form">
+                    <div class="form-group">
+                        <input type="text" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="Keyboard Shortcuts Modal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="exampleModalLabel">Keyboard Shortcuts</h4>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

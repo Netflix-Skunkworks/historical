@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Configuration Reference - Historical</title>
+        <link href="../../css/bootstrap-custom.min.css" rel="stylesheet">
+        <link href="../../css/font-awesome.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/color-brewer.min.css">
+        <link href="../../extra.css" rel="stylesheet">
+        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+            <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+        <![endif]-->
+
+        <script src="../../js/jquery-1.10.2.min.js" defer></script>
+        <script src="../../js/bootstrap-3.0.3.min.js" defer></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+        <script>hljs.initHighlightingOnLoad();</script> 
+    </head>
+
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+            <div class="container">
+
+                <!-- Collapsed navigation -->
+                <div class="navbar-header">
+                    <!-- Expander button -->
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="../..">Historical</a>
+                </div>
+
+                <!-- Expanded navigation -->
+                <div class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li >
+                                <a href="../..">Welcome</a>
+                            </li>
+                            <li >
+                                <a href="../../architecture/">Architecture</a>
+                            </li>
+                            <li class="dropdown active">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">Installation and Configuration <b class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    
+<li >
+    <a href="../">Instructions</a>
+</li>
+                                    
+<li >
+    <a href="../#prerequisites">Prerequisites</a>
+</li>
+                                    
+<li >
+    <a href="../iam/">IAM Setup</a>
+</li>
+                                    
+<li >
+    <a href="../terraform/">Terraform</a>
+</li>
+                                    
+<li class="active">
+    <a href="./">Configuration Reference</a>
+</li>
+                                    
+<li >
+    <a href="../#prepare-docker-container">Prepare Docker Container</a>
+</li>
+                                    
+<li >
+    <a href="../#installation">Installation</a>
+</li>
+                                    
+<li >
+    <a href="../#uninstallation">Uninstallation</a>
+</li>
+                                </ul>
+                            </li>
+                            <li >
+                                <a href="../../troubleshooting/">Troubleshooting</a>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav navbar-right">
+                        <li>
+                            <a href="#" data-toggle="modal" data-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li >
+                                <a rel="next" href="../terraform/">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li >
+                                <a rel="prev" href="../../troubleshooting/">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://github.com/Netflix-Skunkworks/historical/"><i class="fa fa-github"></i> GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+                <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
+    <ul class="nav bs-sidenav">
+        <li class="main active"><a href="#historical-environment-variables-configuration">Historical Environment Variables &amp; Configuration</a></li>
+            <li><a href="#required-fields">Required Fields</a></li>
+            <li><a href="#optional-fields">Optional Fields</a></li>
+            <li><a href="#docker-installer-specific-fields">Docker Installer Specific Fields</a></li>
+            <li><a href="#next-steps">Next Steps</a></li>
+    </ul>
+</div></div>
+                <div class="col-md-9" role="main">
+
+<h1 id="historical-environment-variables-configuration">Historical Environment Variables &amp; Configuration<a class="headerlink" href="#historical-environment-variables-configuration" title="Permanent link">&para;</a></h1>
+<p>Below is a reference of all of the environment variables that Historical makes use of, and the required/default status of them:</p>
+<p>Most of these variables are found in:</p>
+<ul>
+<li><a href="https://github.com/Netflix-Skunkworks/historical/blob/master/historical/constants.py"><code>historical/constants.py</code></a></li>
+<li><a href="https://github.com/Netflix-Skunkworks/historical/blob/master/historical/mapping/__init__.py"><code>historical/mapping/__init__.py</code></a></li>
+</ul>
+<p><strong>NOTE: All environment variables are Strings</strong></p>
+<h2 id="required-fields">Required Fields<a class="headerlink" href="#required-fields" title="Permanent link">&para;</a></h2>
+<p>The fields below are required and <strong>MUST</strong> be configured by you in your Terraform templates:</p>
+<table>
+<thead>
+<tr>
+<th align="center">Variable</th>
+<th align="left">Where to set</th>
+<th align="left">Sample Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>PRIMARY_REGION</code></td>
+<td align="left">Per-stack Terraform template<br /><code>variable PRIMARY_REGION</code></td>
+<td align="left"><code>us-west-2</code></td>
+</tr>
+<tr>
+<td align="center"><code>POLLING_REGIONS</code></td>
+<td align="left">Per-stack Terraform template<br /><code>variable POLLING_REGIONS</code></td>
+<td align="left"><code>["us-west-2", "us-east-1", "eu-west-1"]</code><br />This should be set to the secondary regions for most stacks.<br /><br />S3 is the exception since it's a "global" namespace.<br />For S3, this is always set to the <code>PRIMARY_REGION</code>.<br /><br />This populates the <code>POLL_REGIONS</code> env. var for the<br />Poller Lambdas.</td>
+</tr>
+<tr>
+<td align="center"><code>REGION</code></td>
+<td align="left">Infrastructure <code>main.tf</code><br />This is a variable supplied<br />to Terraform in the<br />application of the template.</td>
+<td align="left">This value is used to determine if the current region<br />of the deployment is the primary region or a secondary region.</td>
+</tr>
+<tr>
+<td align="center"><code>PROXY_REGIONS</code></td>
+<td align="left">Per-stack Terraform template<br /><code>current_proxy_env_vars</code> and <code>durable_proxy_env_vars</code></td>
+<td align="left"><code>us-east-1,eu-west-1,us-east-2,etc.</code><br />This is a comma-separated string of regions.<br /><br />The <code>current_proxy_env_vars</code> for the <code>PRIMARY_REGION</code> needs to be configured to contain the <code>PRIMARY_REGION</code> and all the "off-regions".<br /><br />The <code>durable_proxy_env_vars</code> should contain ALL<br />the regions (default).</td>
+</tr>
+<tr>
+<td align="center"><code>HISTORICAL_TECHNOLOGY</code></td>
+<td align="left">Per-stack Terraform template<br /><code>durable_proxy_env_vars</code></td>
+<td align="left"><code>s3</code> or <code>securitygroup</code>. This should be set in each sample stack properly.</td>
+</tr>
+<tr>
+<td align="center"><code>SIMPLE_DURABLE_PROXY</code></td>
+<td align="left">Per-stack Terraform template<br /><code>durable_proxy_env_vars</code></td>
+<td align="left"><code>True</code> - This is the default value for the Durable Proxy.<br />Don't change this.<br /><br />This value toggles whether the DynamoDB<br />stream events will be serialized nicely for downstream consumption or not.</td>
+</tr>
+<tr>
+<td align="center"><code>ENABLED_ACCOUNTS</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left"><code>ACCOUNTID1,ACCOUNTID2,etc.</code><br />If you are not making use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a>, then you need to set this.</td>
+</tr>
+<tr>
+<td align="center"><code>SWAG_BUCKET</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left"><code>some-s3-bucket-name</code><br />Required if you are making use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a>.</td>
+</tr>
+<tr>
+<td align="center"><code>SWAG_DATA_FILE</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left"><code>v2/accounts.json</code><br />Required if you are making use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a>.<br />Points to where the <code>accounts.json</code> file is located.</td>
+</tr>
+<tr>
+<td align="center"><code>SWAG_OWNER</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left"><code>yourcompany</code><br />Required if you are making use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a>.<br />The entity that owns the accounts you are monitoring.</td>
+</tr>
+<tr>
+<td align="center"><code>SWAG_REGION</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left"><code>us-west-2</code><br />Required if you are making use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a>.<br />The region the <code>SWAG_BUCKET</code> is located.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="default-required-fields">Default Required Fields<a class="headerlink" href="#default-required-fields" title="Permanent link">&para;</a></h3>
+<p>These are fields that are required, but the default values are sufficient. These are not set in the Terraform templates.</p>
+<table>
+<thead>
+<tr>
+<th align="center">Variable</th>
+<th align="left">Description &amp; Defaults</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>CURRENT_REGION</code></td>
+<td align="left">This is populated by the <code>AWS_DEFAULT_REGION</code> environment variable provided by Lambda. This will be set to the region that the Lambda function is running in.</td>
+</tr>
+<tr>
+<td align="center"><code>TTL_EXPIRY</code></td>
+<td align="left">Default: <code>86400</code> seconds. This is the TTL for an item in the Current Table. This is used to account for missing deletion events.</td>
+</tr>
+<tr>
+<td align="center"><code>HISTORICAL_ROLE</code></td>
+<td align="left">Default: <code>Historical</code>. Don't change this -- this is the name of the IAM role that Historical needs to assume to describe resources.</td>
+</tr>
+<tr>
+<td align="center"><code>REGION_ATTR</code></td>
+<td align="left">Default: <code>Region</code>. Don't change this -- this is the name of the region attribute in the DynamoDB table.</td>
+</tr>
+<tr>
+<td align="center"><code>EVENT_TOO_BIG_FLAG</code></td>
+<td align="left">Default: <code>event_too_big</code>. Don't change this -- this is a field name that informs Historical downstream functions if an event is too big to fit in SNS and SQS (&gt;256KB).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="optional-fields">Optional Fields<a class="headerlink" href="#optional-fields" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th align="center">Variable</th>
+<th align="left">Where to set</th>
+<th align="left">Sample Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>RANDOMIZE_POLLER</code></td>
+<td align="left">Per-stack Terraform template<br /><code>poller_env_vars</code></td>
+<td align="left">0 &lt;= value &lt;= 900. Number of seconds to delay<br />Polling messages in SQS.<br /><br />It is recommended you set this to <code>"900"</code> for the Poller.</td>
+</tr>
+<tr>
+<td align="center"><code>LOGGING_LEVEL</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left"><a href="https://github.com/Netflix-Skunkworks/historical/blob/master/historical/constants.py#L13-L17">Any one of these values</a>. <code>DEBUG</code> is recommended.</td>
+</tr>
+<tr>
+<td align="center"><code>TEST_ACCOUNTS_ONLY</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left">Default <code>False</code>. This is used if you are making use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a>.<br /><br />Set this to <code>True</code> if you want your stack to <em>ONLY</em> query<br />against "test" accounts. Useful for having<br />"test" and "prod" stacks.</td>
+</tr>
+<tr>
+<td align="center"><code>PROXY_BATCH_SIZE</code></td>
+<td align="left">Per-stack Terraform template<br /><code>current_proxy_env_vars</code>.</td>
+<td align="left">Default: <code>10</code>. Set this if the batched event size is too<br />big (&gt;256KB) to send to SQS. This should be refactored<br />in the future so that this is not necessary.</td>
+</tr>
+<tr>
+<td align="center"><code>SENTRY_DSN</code></td>
+<td align="left">Per-stack Terraform template<br /><code>env_vars</code></td>
+<td align="left">If you make use of <a href="https://sentry.io/">Sentry</a>, then set this to your DSN.<br /><br />Historical makes use of the <a href="https://github.com/Netflix-Skunkworks/raven-python-lambda"><code>raven-python-lambda</code></a> for Sentry.<br />You can also optionally use SQS as a transport layer for<br />Sentry messages via <a href="https://github.com/Netflix-Skunkworks/raven-sqs-proxy"><code>raven-sqs-proxy</code></a>.</td>
+</tr>
+<tr>
+<td align="center">Custom Tags</td>
+<td align="left">Per-stack Terraform template<br /><code>tags</code></td>
+<td align="left">Add in a name-value pair of tags you want to affix<br />to your Lambda functions.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="docker-installer-specific-fields">Docker Installer Specific Fields<a class="headerlink" href="#docker-installer-specific-fields" title="Permanent link">&para;</a></h2>
+<p>The fields below are specific for installation and uninstallation of Historical via the Docker container.  These values are present in the <a href="https://github.com/Netflix-Skunkworks/historical/blob/master/terraform/SAMPLE-env.list"><code>terraform/SAMPLE-env.list</code></a> file.</p>
+<p><strong>ALL FIELDS BELOW ARE REQUIRED</strong></p>
+<table>
+<thead>
+<tr>
+<th align="center">Variable</th>
+<th align="left">Sample Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><code>AWS_ACCESS_KEY_ID</code></td>
+<td align="left">The AWS Access Key ID for the credential that will be used to run Terraform. This is for a very powerful IAM Role.</td>
+</tr>
+<tr>
+<td align="center"><code>AWS_SECRET_ACCESS_KEY</code></td>
+<td align="left">The AWS Secret Access Key for the credential that will be used to run Terraform. This is for a very powerful IAM Role.</td>
+</tr>
+<tr>
+<td align="center"><code>AWS_SESSION_TOKEN</code></td>
+<td align="left">The AWS Session Token for the credential that will be used to run Terraform. This is for a very powerful IAM Role.</td>
+</tr>
+<tr>
+<td align="center"><code>TECH</code></td>
+<td align="left">The Historical resource type for the stack in question. Either <code>s3</code> or <code>securitygroup</code> (for now).</td>
+</tr>
+<tr>
+<td align="center"><code>PRIMARY_REGION</code></td>
+<td align="left">The Primary Region of your Historical Stack.</td>
+</tr>
+<tr>
+<td align="center"><code>SECONDARY_REGIONS</code></td>
+<td align="left">The Secondary Regions of your Historical Stack. This is a comma separated string.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p><a href="/installation">Please return to the Installation documentation</a>.</p></div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js" defer></script>
+        <script src="../../search/main.js" defer></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="Search Modal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="exampleModalLabel">Search</h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    From here you can search these documents. Enter
+                    your search terms below.
+                </p>
+                <form role="form">
+                    <div class="form-group">
+                        <input type="text" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="Keyboard Shortcuts Modal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                <h4 class="modal-title" id="exampleModalLabel">Keyboard Shortcuts</h4>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

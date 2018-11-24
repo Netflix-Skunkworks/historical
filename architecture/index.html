@@ -53,8 +53,45 @@
                             <li class="active">
                                 <a href="./">Architecture</a>
                             </li>
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">Installation and Configuration <b class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    
+<li >
+    <a href="../installation/">Instructions</a>
+</li>
+                                    
+<li >
+    <a href="../installation/#prerequisites">Prerequisites</a>
+</li>
+                                    
+<li >
+    <a href="../installation/iam/">IAM Setup</a>
+</li>
+                                    
+<li >
+    <a href="../installation/terraform/">Terraform</a>
+</li>
+                                    
+<li >
+    <a href="../installation/configuration/">Configuration Reference</a>
+</li>
+                                    
+<li >
+    <a href="../installation/#prepare-docker-container">Prepare Docker Container</a>
+</li>
+                                    
+<li >
+    <a href="../installation/#installation">Installation</a>
+</li>
+                                    
+<li >
+    <a href="../installation/#uninstallation">Uninstallation</a>
+</li>
+                                </ul>
+                            </li>
                             <li >
-                                <a href="../installation/">Installation and Configuration</a>
+                                <a href="../troubleshooting/">Troubleshooting</a>
                             </li>
                         </ul>
 
@@ -70,12 +107,12 @@
                                 </a>
                             </li>
                             <li >
-                                <a rel="prev" href="../installation/">
+                                <a rel="prev" href="../installation/iam/">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
                             <li>
-                                <a href="https://github.com/Netflix-Skunkworks/historical/edit/master/docs/architecture.md"><i class="fa fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/Netflix-Skunkworks/historical/"><i class="fa fa-github"></i> GitHub</a>
                             </li>
                     </ul>
                 </div>
@@ -87,7 +124,7 @@
     <ul class="nav bs-sidenav">
         <li class="main active"><a href="#historical-architecture">Historical Architecture</a></li>
             <li><a href="#general-architectural-overview">General Architectural Overview</a></li>
-            <li><a href="#prerequisites">Prerequisites</a></li>
+            <li><a href="#prerequisite-overview">Prerequisite Overview</a></li>
             <li><a href="#regions">Regions</a></li>
             <li><a href="#component-overview">Component Overview</a></li>
             <li><a href="#special-stacks">Special Stacks</a></li>
@@ -107,19 +144,15 @@
 <p>Historical is <em>both</em> a polling and event driven system. It will periodically poll AWS accounts for changes. However, because Historical responds to events in the environment, polling doesn't need to be very aggressive and only happens once every few hours.</p>
 <p>Polling is necessary because events are not 100% reliable. This ensures that data is current just in case an event is dropped.</p>
 <p>Historical is <em>eventually consistent</em>, and makes a <em>best effort</em> to maintain a current and up-to-date inventory of AWS resources.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>For all of this to work the following prerequisites that must be satisfied:</p>
+<h2 id="prerequisite-overview">Prerequisite Overview<a class="headerlink" href="#prerequisite-overview" title="Permanent link">&para;</a></h2>
+<p>This is an overview of the prerequisites that are required to make Historical operate. For more details on setting up the required prerequisites, please review to the <a href="installation/">installation documentation</a>.</p>
 <ol>
 <li><strong>ALL AWS</strong> accounts must be configured to send CloudWatch events over a CloudWatch Event Bus to the Historical AWS account.</li>
 <li><strong>ALL AWS accounts</strong> and <strong>ALL regions</strong> in those accounts need to have a CloudWatch Event rule that captures ALL events and sends them over the Event Bus.</li>
 <li><strong>ALL AWS</strong> accounts must have CloudTrail enabled.</li>
-<li>A <code>Historical</code> IAM role must exist in <strong>ALL AWS accounts</strong> with permissions that are defined <strong>here</strong>*(TODO ADD THESE!). This role must have an <code>AssumeRolePolicyDocument</code> to permit access from the <code>HistoricalLambdaProfile</code> IAM role in the Historical Account.</li>
-<li>Historical makes use of <a href="https://github.com/Netflix-Skunkworks/swag-api">SWAG</a> to define which AWS accounts Historical is enabled for. SWAG must be properly configured for Historical to operate.</li>
+<li>IAM roles must exist in <strong>ALL</strong> accounts and be assumable by the Historical Lambda functions.</li>
+<li>Historical makes use of <a href="https://github.com/Netflix-Skunkworks/swag-client">SWAG</a> to define which AWS accounts Historical is enabled for. SWAG must be properly configured for Historical to operate. Alternatively, you can specify the AWS Account IDs that Historical will examine via an environment variable. However, it is <em>highly recommended</em> that you make use of SWAG.</li>
 </ol>
-<p>The CloudWatch configuration is outlined here:
-<img alt="CW Event Bus Diagram" src="../img/cw-events.png" /></p>
-<p>The IAM configuration is outlined here:
-TODO ADD ME</p>
 <h2 id="regions">Regions<a class="headerlink" href="#regions" title="Permanent link">&para;</a></h2>
 <p>Historical has the concept of regions that fit 3 categories:</p>
 <ul>
@@ -216,7 +249,7 @@ AWS.</p>
 <p>The secondary regions will still respond to in-region events, but lack all polling components.</p>
 <p><a href="../img/historical-s3.jpg">This diagram showcases the S3 stack.</a></p>
 <h2 id="installation-configuration">Installation &amp; Configuration<a class="headerlink" href="#installation-configuration" title="Permanent link">&para;</a></h2>
-<p>Please refer to the installation docs for additional details.</p></div>
+<p>Please refer to the <a href="/installation">installation docs</a> for additional details.</p></div>
         </div>
 
         <footer class="col-md-12">
