@@ -145,7 +145,7 @@
 <p>Polling is necessary because events are not 100% reliable. This ensures that data is current just in case an event is dropped.</p>
 <p>Historical is <em>eventually consistent</em>, and makes a <em>best effort</em> to maintain a current and up-to-date inventory of AWS resources.</p>
 <h2 id="prerequisite-overview">Prerequisite Overview<a class="headerlink" href="#prerequisite-overview" title="Permanent link">&para;</a></h2>
-<p>This is an overview of the prerequisites that are required to make Historical operate. For more details on setting up the required prerequisites, please review to the <a href="installation/">installation documentation</a>.</p>
+<p>This is an overview of the prerequisites that are required to make Historical operate. For more details on setting up the required prerequisites, please review to the <a href="../installation">installation documentation</a>.</p>
 <ol>
 <li><strong>ALL AWS</strong> accounts must be configured to send CloudWatch events over a CloudWatch Event Bus to the Historical AWS account.</li>
 <li><strong>ALL AWS accounts</strong> and <strong>ALL regions</strong> in those accounts need to have a CloudWatch Event rule that captures ALL events and sends them over the Event Bus.</li>
@@ -249,7 +249,7 @@ AWS.</p>
 <p>The secondary regions will still respond to in-region events, but lack all polling components.</p>
 <p><a href="../img/historical-s3.jpg">This diagram showcases the S3 stack.</a></p>
 <h2 id="installation-configuration">Installation &amp; Configuration<a class="headerlink" href="#installation-configuration" title="Permanent link">&para;</a></h2>
-<p>Please refer to the <a href="/installation">installation docs</a> for additional details.</p></div>
+<p>Please refer to the <a href="../installation">installation docs</a> for additional details.</p></div>
         </div>
 
         <footer class="col-md-12">
