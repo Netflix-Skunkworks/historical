@@ -1,10 +1,20 @@
 site_name: Historical
-repo_url: https://github.com/Netflix-Skunkworks/historical
+repo_url: https://github.com/Netflix-Skunkworks/historical/
 repo_name: GitHub
-pages:
+edit_uri: ""
+nav:
   - Welcome: index.md
   - Architecture: architecture.md
-  - Installation and Configuration: installation.md
+  - Installation and Configuration:
+      - Instructions: installation/
+      - Prerequisites: installation/#prerequisites
+      - IAM Setup: installation/iam.md
+      - Terraform: installation/terraform.md
+      - Configuration Reference: installation/configuration.md
+      - Prepare Docker Container: installation/#prepare-docker-container
+      - Installation: installation/#installation
+      - Uninstallation: installation/#uninstallation
+  - Troubleshooting: troubleshooting.md
 theme:
   name: yeti
   custom_dir: custom_theme/

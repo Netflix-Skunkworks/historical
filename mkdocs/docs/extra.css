@@ -1,13 +1,22 @@
+.navbar .dropdown-menu>li>a, .navbar .dropdown-menu>li>a:focus {
+    font-weight: 400;
+}
+
 .navbar-default {
-    background-color: #00526E
+    background-color: #00526E;
+    font-weight: 400;
 }
 
 .navbar-default .navbar-nav>.active>a, .navbar-default .navbar-nav>.active>a:hover, .navbar-default .navbar-nav>.active>a:focus {
-    background-color: #32748B
+    background-color: #32748B;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight: 400;
 }
 
 .navbar-default .navbar-nav>li>a:hover, .navbar-default .navbar-nav>li>a:focus {
-    background-color: #003142
+    background-color: #003142;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-weight: 400;
 }
 
 body {
@@ -18,4 +27,8 @@ body {
 h1, h2, h3, h4, h5, h6 {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-weight: 500;
+}
+
+table {
+    font-size: 15px;
 }
