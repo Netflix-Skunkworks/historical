@@ -150,8 +150,7 @@ your environment. Historical achieves this by describing AWS resources when they
 <p>Historical enables downstream consumers to react to changes in the AWS environment
 without the need to directly describe the resource. This greatly increases speed of reaction, reduces IAM permission complexity, and also avoids rate limiting.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p>Historical leverages AWS CloudWatch Events. Events trigger a "Collector" Lambda function to describe the AWS resource that changed, and saves the configuration of the resource into a DynamoDB table. From this, a "Differ" Lambda function checks if the resource has effectively changed from what was previously known about that resource. If the item has changed, a new change record is logged, which then enables downstream
-consumers the ability to react to changes in the environment as the environment effectively changes.</p>
+<p>Historical leverages AWS CloudWatch Events. Events trigger a "Collector" Lambda function to describe the AWS resource that changed, and saves the configuration into a DynamoDB table. From this, a "Differ" Lambda function checks if the resource has changed from what was previously known about that resource. If the item has changed, a new change record is saved, which then enables downstream consumers the ability to react to changes in the environment as the environment effectively changes over time.</p>
 <p>The CloudTrail context on the change is preserved in the change history.</p>
 <h2 id="current-technologies-implemented">Current Technologies Implemented<a class="headerlink" href="#current-technologies-implemented" title="Permanent link">&para;</a></h2>
 <ul>
@@ -253,5 +252,5 @@ consumers the ability to react to changes in the environment as the environment 
 
 <!--
 MkDocs version : 1.0.4
-Build Date UTC : 2018-11-24 02:29:51
+Build Date UTC : 2018-11-27 17:12:01
 -->
