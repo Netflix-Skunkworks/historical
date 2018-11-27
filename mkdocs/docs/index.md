@@ -16,8 +16,7 @@ Historical enables downstream consumers to react to changes in the AWS environme
 without the need to directly describe the resource. This greatly increases speed of reaction, reduces IAM permission complexity, and also avoids rate limiting.
 
 ## How it works
-Historical leverages AWS CloudWatch Events. Events trigger a "Collector" Lambda function to describe the AWS resource that changed, and saves the configuration of the resource into a DynamoDB table. From this, a "Differ" Lambda function checks if the resource has effectively changed from what was previously known about that resource. If the item has changed, a new change record is logged, which then enables downstream
-consumers the ability to react to changes in the environment as the environment effectively changes.
+Historical leverages AWS CloudWatch Events. Events trigger a "Collector" Lambda function to describe the AWS resource that changed, and saves the configuration into a DynamoDB table. From this, a "Differ" Lambda function checks if the resource has changed from what was previously known about that resource. If the item has changed, a new change record is saved, which then enables downstream consumers the ability to react to changes in the environment as the environment effectively changes over time.
 
 The CloudTrail context on the change is preserved in the change history.
 
