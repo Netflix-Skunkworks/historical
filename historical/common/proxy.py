@@ -48,14 +48,16 @@ def shrink_blob(record, deletion):
     if record.get("userIdentity"):
         item["userIdentity"] = record["userIdentity"]
 
-    # Remove the 'configuration' field from new and old images if applicable:
+    # Remove the 'configuration' and 'requestParameters' fields from new and old images if applicable:
     if not deletion:
         # Only remove it from non-deletions:
         if record['dynamodb'].get('NewImage'):
             record['dynamodb']['NewImage'].pop('configuration', None)
+            record['dynamodb']['NewImage'].pop('requestParameters', None)
 
     if record['dynamodb'].get('OldImage'):
         record['dynamodb']['OldImage'].pop('configuration', None)
+        record['dynamodb']['OldImage'].pop('requestParameters', None)
 
     item['dynamodb'] = record['dynamodb']
 
